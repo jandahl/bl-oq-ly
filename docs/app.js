@@ -31,7 +31,6 @@ let deconstructAbort = null;
 let paletteVisible = true;
 let lastDeconstructIds = null;
 let blocklyThemes = null;
-let lastBuildSeq = null;
 let lastDeconstructWord = "";
 let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
@@ -159,13 +158,11 @@ function refreshBuild() {
 	const chains = topLevelChains(workspace);
 	if (chains.length === 0) {
 		setStatus("Drag a morpheme block in to begin.", "");
-		lastBuildSeq = null;
 		updateReadingLine(null);
 		return;
 	}
 	if (chains.length > 1) {
 		setStatus("More than one stack on the canvas — combine into a single stack.", "error");
-		lastBuildSeq = null;
 		updateReadingLine(null);
 		return;
 	}
@@ -173,21 +170,18 @@ function refreshBuild() {
 	const seq = seqForChain(ids);
 	if (!seq) {
 		setStatus("Unknown morpheme in stack.", "error");
-		lastBuildSeq = null;
 		updateReadingLine(null);
 		return;
 	}
 	const result = buildWord(seq);
 	if (!result.ok) {
 		setStatus(`✗ ${result.reason || "invalid sequence"}`, "error", `at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`);
-		lastBuildSeq = null;
 		updateReadingLine(null);
 		return;
 	}
 	const prefix = result.approximate ? "≈ " : "";
 	const kind = result.approximate ? "approx" : "ok";
 	setStatus(`${prefix}${result.word}`, kind, result.closed ? "complete word" : "mid-derivation — keep building");
-	lastBuildSeq = seq;
 	updateReadingLine(seq);
 }
 

@@ -1,0 +1,17 @@
+{
+  "name": "bl-oq-ly",
+  "private": true,
+  "type": "module",
+  "description": "Dev/test tooling for the docs/ static site. docs/ itself stays plain ES modules with no build step, no bundler, no dependency on this file — this package.json exists only for lint/test/CI, never for the deployed page.",
+  "scripts": {
+    "lint": "eslint docs test",
+    "test:unit": "node --test test/unit/**/*.test.js",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
+    "serve": "python3 -m http.server 8000 --directory docs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "eslint": "^9.13.0"
+  }
+}

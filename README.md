@@ -182,6 +182,57 @@ cd docs && python3 -m http.server 8000
 Then open `http://localhost:8000/`. (A plain `file://` open won't work —
 browsers block ES module imports over `file://`.)
 
+## Testing
+
+`docs/` itself stays a plain, dependency-free static site — this section's
+tooling (`package.json`, `node_modules/`, ESLint, Playwright) exists purely
+for development/CI and is never fetched by the deployed page.
+
+```bash
+npm install
+npm run lint       # ESLint over docs/ and test/ — correctness rules only,
+                    # no style/formatting opinions, so it never fights the
+                    # existing code's own formatting
+npm run test:unit  # node --test over test/unit/ — pure logic only
+                    # (gloss.js, blocks.js's Blockly-independent exports),
+                    # zero extra dependency beyond Node itself
+npm run test:e2e   # Playwright, a real headless Chromium against the real
+                    # app — see below
+npm test           # unit + e2e
+```
+
+**Why an E2E suite, and why it hits live endpoints.** Most of this repo's
+real regressions so far were invisible to a human reading the diff: Blockly
+silently ignoring a per-instance toolbox colour override, `updateToolbox
+(null)` throwing, a connection constraint that was *too* restrictive and
+blocked a legal construction, a translation line quietly reading the wrong
+field. Every one of those was only caught by actually driving the app in a
+real browser — until this pass, that verification only ever existed as a
+one-off script written by hand each round and thrown away afterward.
+`test/e2e/app.spec.js` codifies those exact checks so they run on every
+push instead of only when someone happens to remember to re-check by hand;
+each test names which past bug it guards against.
+
+`playwright.config.js` points the E2E suite at oq.dicknog.dk and
+grammarian's live published catalog, not a frozen local fixture — see that
+file's own comment. This repo's stated posture throughout is that a broken
+build can be this repo's own bug *or* an upstream oq/grammarian break (both
+carry no stability promise — see "Data sources" above), and only testing
+against a snapshot would hide the second kind entirely. **A red E2E run in
+CI is real information either way** — check which it is (the failure names
+the assertion; a `buildWord`/`analyzeWord`/`glossSummaryItems` shape change
+upstream reads differently from a real regression in this repo's own diff)
+before assuming it's this repo's fault to fix.
+
+`test/unit/` covers the Blockly-independent pure logic directly (fast,
+no browser, easy to pin exact input/output shapes) — `test/e2e/` covers
+everything that actually depends on Blockly's or the DOM's real behaviour,
+which past experience here says cannot be reliably reasoned about from
+reading the source alone.
+
+CI (`.github/workflows/ci.yml`) runs lint + unit tests, and the E2E suite,
+on every push and PR.
+
 ## Scope notes (MVP)
 
 - No persistence, no accounts, no saved workspaces.

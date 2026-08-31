@@ -1,0 +1,227 @@
+// @ts-check
+// End-to-end suite against the real app in a real browser — codifying the
+// checks that, until now, only ever existed as one-off scripts written by
+// hand each round and thrown away afterward. Every scenario here caught a
+// real shipped bug at least once (see each test's own comment for which).
+//
+// Deliberately hits oq.dicknog.dk and grammarian's live published catalog
+// (see playwright.config.js's own comment) rather than a local fixture —
+// this repo's whole stated posture is that a break here can be this repo's
+// own bug OR an upstream one, and only testing against a frozen local
+// snapshot would hide the second kind entirely.
+import { test, expect } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+	// Uncaught JS exceptions always mean something real broke -- fail hard.
+	page.on("pageerror", (err) => {
+		throw new Error(`Unexpected uncaught page error: ${err.message}`);
+	});
+	// A failed network request's URL isn't available from a console message
+	// (Chrome deliberately omits it from console.error's own text for a
+	// resource-load failure), so this checks page.on("response") instead,
+	// which does carry the URL. Blockly's own default media path
+	// (blockly-demo.appspot.com/static/media/*.png etc.) 404s/resets against
+	// any origin that isn't blockly-demo.appspot.com itself -- cosmetic,
+	// unrelated to this app, expected on every load, filtered out by
+	// hostname here so a real regression isn't lost in known noise.
+	page.on("response", (response) => {
+		if (response.ok()) return;
+		if (new URL(response.url()).hostname === "blockly-demo.appspot.com") return;
+		throw new Error(`Unexpected failed request: ${response.status()} ${response.url()}`);
+	});
+	await page.goto("/");
+	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
+});
+
+test("catalog loads with a real morpheme count and surfaces the non-authoritative note", async ({ page }) => {
+	const status = await page.textContent("#status-line");
+	expect(status).toMatch(/Loaded \d{3,} morphemes\./);
+	expect(status).toContain("hand-authored, not yet dictionary-verified");
+});
+
+async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText, dropX, dropY) {
+	const category = page.locator(".blocklyTreeLabel").filter({ hasText: categoryLabelText }).first();
+	await category.click({ force: true });
+	await page.waitForTimeout(400);
+	const block = page.locator(".blocklyFlyout .blocklyDraggable").first();
+	const box = await block.boundingBox();
+	if (!box) throw new Error("flyout block has no bounding box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(dropX, dropY, { steps: 10 });
+	await page.mouse.up();
+	await page.waitForTimeout(500);
+}
+
+test("Build: dragging a single stem in produces a complete-word status (regression guard: buildWord() wiring)", async ({ page }) => {
+	await dragFirstFlyoutBlockIntoWorkspace(page, "Stems — nouns", 250, 120);
+	await expect(page.locator("#status")).toHaveClass(/ok/);
+	await expect(page.locator("#status-line")).not.toBeEmpty();
+	await expect(page.locator("#status .meta")).toContainText("complete word");
+});
+
+test("Build: toolbox blocks are colour-coded per category, not a single shared colour (bl-oq-ly#6: Blockly silently ignores a per-instance toolbox colour override)", async ({ page }) => {
+	const stemColour = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const b = ws.newBlock("morpheme_block__stem_n");
+		const colour = b.getColour();
+		b.dispose(false);
+		return colour;
+	});
+	const affixColour = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const b = ws.newBlock("morpheme_block__deriv_affix");
+		const colour = b.getColour();
+		b.dispose(false);
+		return colour;
+	});
+	expect(stemColour).not.toEqual(affixColour);
+});
+
+test("Build: block labels always show the real Kalaallisut spelling, and hide grammarian's internal id by default (bl-oq-ly#10/#14)", async ({ page }) => {
+	await page.fill("#morpheme-filter", "V_IND_INTR_1SG");
+	await page.locator(".blocklyTreeLabel").first().click({ force: true });
+	await page.waitForTimeout(400);
+	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
+	expect(label).toContain("-vunga");
+	expect(label).not.toContain("V_IND_INTR_1SG");
+	expect(label).not.toContain("statement");
+
+	await page.click("#opt-show-ids");
+	await page.waitForTimeout(400);
+	await page.locator(".blocklyTreeLabel").first().click({ force: true });
+	await page.waitForTimeout(400);
+	const labelWithId = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
+	expect(labelWithId).toContain("V_IND_INTR_1SG");
+	expect(labelWithId).toContain("-vunga");
+});
+
+test("Build: directional connections — a stem can't be preceded, a word-final ending can take an enclitic, a particle is fully standalone (bl-oq-ly#11/#15)", async ({ page }) => {
+	const result = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const mk = (type) => { const b = ws.newBlock(type); b.initSvg(); b.render(); return b; };
+		const stem = mk("morpheme_block__stem_n");
+		const ending = mk("morpheme_block__inflection");
+		const enclitic = mk("morpheme_block__enclitic");
+		const particle = mk("morpheme_block__particle");
+		const out = {
+			stemHasPrevious: stem.previousConnection !== null,
+			endingHasNext: ending.nextConnection !== null,
+			endingToEncliticTypeChecks: ending.nextConnection
+				? ending.nextConnection.getConnectionChecker().doTypeChecks(ending.nextConnection, enclitic.previousConnection)
+				: null,
+			encliticHasNext: enclitic.nextConnection !== null,
+			particleHasPrevious: particle.previousConnection !== null,
+			particleHasNext: particle.nextConnection !== null,
+		};
+		for (const b of [stem, ending, enclitic, particle]) b.dispose(false);
+		return out;
+	});
+	expect(result.stemHasPrevious).toBe(false);
+	expect(result.endingHasNext).toBe(true);
+	expect(result.endingToEncliticTypeChecks).toBe(true);
+	expect(result.encliticHasNext).toBe(false);
+	expect(result.particleHasPrevious).toBe(false);
+	expect(result.particleHasNext).toBe(false);
+});
+
+test("Build: palette Hide/Show actually hides the toolbox, and never throws (bl-oq-ly#9: updateToolbox(null) throws — must use Toolbox.setVisible())", async ({ page }) => {
+	await expect(page.locator(".blocklyToolboxDiv")).toBeVisible();
+	await page.click("#palette-toggle");
+	await page.waitForTimeout(300);
+	await expect(page.locator(".blocklyToolboxDiv")).toBeHidden();
+	await page.click("#palette-toggle");
+	await page.waitForTimeout(300);
+	await expect(page.locator(".blocklyToolboxDiv")).toBeVisible();
+});
+
+test("Build: filter narrows the toolbox and closes any already-open flyout (bl-oq-ly#9: a stale flyout used to keep showing unfiltered content)", async ({ page }) => {
+	await page.locator(".blocklyTreeLabel").filter({ hasText: "Derivational affixes" }).first().click({ force: true });
+	await page.waitForTimeout(400);
+	await expect(page.locator(".blocklyFlyout .blocklyDraggable").first()).toBeVisible();
+	await page.fill("#morpheme-filter", "qimme");
+	await page.waitForTimeout(400);
+	// The flyout must CLOSE on filter, not keep showing the previously-open
+	// category's now-irrelevant contents. Blockly reuses the flyout's own DOM
+	// (blocks stay present but hidden when closed), so checking block COUNT
+	// would pass even while stale content sits there invisibly -- what
+	// actually matters is that no flyout block is actually visible.
+	await expect(page.locator(".blocklyFlyout .blocklyDraggable:visible")).toHaveCount(0);
+	await expect(page.locator(".blocklyTreeLabel")).toHaveText([/Stems — nouns \(1\)/]);
+});
+
+test("Build: theme toggle actually re-themes Blockly's own chrome, not just the page (bl-oq-ly#7)", async ({ page }) => {
+	const initial = await page.evaluate(() => Blockly.getMainWorkspace().getTheme().name);
+	await page.click("#theme-toggle"); // auto -> light
+	await page.click("#theme-toggle"); // light -> dark
+	await page.waitForTimeout(200);
+	const afterDark = await page.evaluate(() => Blockly.getMainWorkspace().getTheme().name);
+	expect(afterDark).toContain("dark");
+	expect(afterDark).not.toBe(initial === "bl-oq-ly-dark" ? undefined : initial);
+	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
+test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morpheme breakdown, not a raw id list (bl-oq-ly#4/#16)", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+
+	await expect(page.locator(".breakdown-word")).toHaveText("qimmeqarpunga");
+	// The single most important regression this suite exists to prevent:
+	// bl-oq-ly shipped " · "-joined per-morpheme fragments TWICE where oq's
+	// own Deconstruct shows one composed sentence.
+	await expect(page.locator(".breakdown-translation")).toHaveText("I have a dog");
+
+	const rows = page.locator(".breakdown-row");
+	await expect(rows).toHaveCount(3);
+	const rowText = await rows.allTextContents();
+	expect(rowText.some((t) => t.includes("qimmeq") && t.includes("dog"))).toBe(true);
+	expect(rowText.some((t) => /statement/i.test(t))).toBe(true); // as its own badge, not folded into the gloss
+
+	// No raw grammarian id (e.g. "V_IND_INTR_1SG") should leak into the breakdown.
+	for (const t of rowText) expect(t).not.toMatch(/[A-Z]_[A-Z]/);
+});
+
+test("Deconstruct: reading-order toggle reverses the rows but never the composed translation (bl-oq-ly#11)", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+
+	// "Read last morpheme first" defaults ON (index.html's #opt-reading-order
+	// starts checked), so the FIRST row on a fresh Deconstruct is already the
+	// last morpheme (the mood ending), not the stem.
+	const firstRowEndingFirst = await page.locator(".breakdown-row").first().locator(".breakdown-spelling").textContent();
+	expect(firstRowEndingFirst).toContain("vunga");
+
+	await page.click("#opt-reading-order"); // turn off -> stem-first
+	await page.waitForTimeout(300);
+	const firstRowAfterToggle = await page.locator(".breakdown-row").first().locator(".breakdown-spelling").textContent();
+	expect(firstRowAfterToggle).toContain("qimmeq");
+	await expect(page.locator(".breakdown-translation")).toHaveText("I have a dog");
+});
+
+test("Deconstruct -> Move to Word Builder recreates the exact verified chain as connected, editable blocks (bl-oq-ly#8)", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await page.click("#move-to-builder-btn");
+	await page.waitForTimeout(500);
+
+	await expect(page.locator("#mode-build")).toHaveClass(/active/);
+	const chain = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const tops = ws.getTopBlocks(true);
+		return tops.map((top) => {
+			const ids = [];
+			let cur = top;
+			while (cur) { ids.push(cur.data); cur = cur.getNextBlock(); }
+			return ids;
+		});
+	});
+	expect(chain).toEqual([["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]]);
+	await expect(page.locator("#status")).toHaveClass(/ok/);
+	await expect(page.locator("#reading-line")).toHaveText("I have a dog");
+});
