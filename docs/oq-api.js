@@ -10,13 +10,22 @@
 // drop any export"), that is a real, documented risk — see README.md.
 const OQ_BASE = "https://oq.spacepope.dk/";
 
+// glossSummaryItems (structured, carries shortGloss) exists internally in
+// oq but is NOT part of the exported public-api.js surface on the version
+// currently deployed to oq.spacepope.dk (API_VERSION 0.3.0) — only the
+// string-joining glossSummary() is exported. public-api.md is explicit that
+// only the exported surface is safe to depend on ("everything else...is
+// internal plumbing, free to change without notice"), so breakdown.js parses
+// glossSummary's "marker+text — gloss" strings instead of importing the
+// unexported function directly. Revisit once glossSummaryItems (or the
+// shorter, blank-filled shortGloss it carries) ships on the exported surface.
 export const {
 	buildWord,
 	analyzeWord,
 	analyzeWordAsync,
 	morphemeEntryToPreset,
 	mergeMorphemeSources,
-	glossSummaryItems,
+	glossSummary,
 	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
 } = await import(/* @vite-ignore */ `${OQ_BASE}public-api.js`);

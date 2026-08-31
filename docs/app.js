@@ -1,6 +1,7 @@
-import { buildWord, analyzeWordAsync } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, glossSummary } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
-import { defineMorphemeBlock, topLevelChains, renderReadOnlyChain } from "./blocks.js";
+import { defineMorphemeBlock, buildToolbox, topLevelChains } from "./blocks.js";
+import { renderBreakdown } from "./breakdown.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
@@ -10,15 +11,13 @@ const panelBuild = document.getElementById("panel-build");
 const panelDeconstruct = document.getElementById("panel-deconstruct");
 const wordInput = document.getElementById("word-input");
 const analyzeBtn = document.getElementById("analyze-btn");
-
-const TOOLBOX = {
-	kind: "flyoutToolbox",
-	contents: [{ kind: "block", type: "morpheme_block" }],
-};
+const blocklyDiv = document.getElementById("blockly-div");
+const breakdownDiv = document.getElementById("breakdown");
 
 let mode = "build";
 let presets = [];
 let presetsById = new Map();
+let toolbox = null;
 let workspace = null;
 let deconstructAbort = null;
 
@@ -77,18 +76,18 @@ async function runDeconstruct() {
 	if (!word) return;
 	if (deconstructAbort) deconstructAbort.abort();
 	deconstructAbort = new AbortController();
+	breakdownDiv.innerHTML = "";
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
 		if (!result.matches || result.matches.length === 0) {
 			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
-			workspace.clear();
 			return;
 		}
 		const best = result.matches[0];
-		const ids = best.seq.map((item) => item.id).filter(Boolean);
-		renderReadOnlyChain(workspace, ids);
-		setStatus(`${word} → ${ids.join(" + ")}`, "ok", `${result.matches.length} verified breakdown(s) found`);
+		const built = buildWord(best.seq);
+		renderBreakdown(breakdownDiv, word, best.seq, built, glossSummary);
+		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
 	} catch (err) {
 		if (err?.name === "AbortError") return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
@@ -103,13 +102,15 @@ function setMode(next) {
 	modeDeconstructBtn.setAttribute("aria-selected", String(next === "deconstruct"));
 	panelBuild.classList.toggle("active", next === "build");
 	panelDeconstruct.classList.toggle("active", next === "deconstruct");
+	blocklyDiv.hidden = next !== "build";
+	breakdownDiv.hidden = next !== "deconstruct";
 
-	workspace.clear();
 	if (next === "build") {
-		workspace.updateToolbox(TOOLBOX);
+		workspace.clear();
+		requestAnimationFrame(() => Blockly.svgResize(workspace));
 		setStatus("Drag a morpheme block in to begin.", "");
 	} else {
-		workspace.updateToolbox(null);
+		breakdownDiv.innerHTML = "";
 		setStatus("Type a word and press Deconstruct.", "");
 	}
 }
@@ -120,14 +121,18 @@ async function main() {
 	presets = catalog.presets;
 	presetsById = new Map(presets.map((p) => [p.id, p]));
 
-	defineMorphemeBlock(presets);
+	defineMorphemeBlock();
+	toolbox = buildToolbox(presets);
 
-	workspace = Blockly.inject("blockly-div", {
-		toolbox: TOOLBOX,
+	workspace = Blockly.inject(blocklyDiv, {
+		toolbox,
 		trashcan: true,
 		zoom: { controls: true, wheel: true },
+		move: { scrollbars: true, drag: true, wheel: true },
 	});
 	workspace.addChangeListener(() => refreshBuild());
+	window.addEventListener("resize", () => Blockly.svgResize(workspace));
+	window.addEventListener("orientationchange", () => Blockly.svgResize(workspace));
 
 	const authNote = catalog.authoritative === false ? " (grammarian data is hand-authored, not yet dictionary-verified — see its own CLAUDE.md)" : "";
 	setStatus(`Loaded ${presets.length} morphemes.${authNote}`, "");

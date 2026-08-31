@@ -9,29 +9,46 @@ is a standalone static site, reachable only by its own direct URL.
 
 ## What it does
 
-One canvas, two modes:
+One page, two modes:
 
-- **Build**: drag morpheme blocks from the palette and snap them into a
-  single top-to-bottom stack, stem first. Every change re-runs oq's real
-  `buildWord()` pipeline (morphotactic grammar check → allomorphy → sandhi
-  joins → display respelling) and shows the resulting surface form live, or
-  the reason the stack doesn't yet form a legal word.
+- **Build**: drag morpheme blocks from a categorized Blockly toolbox (Stems
+  — nouns, Stems — verbs, Derivational affixes, Inflectional endings,
+  Enclitics, ... — one category per grammarian `lexical_facts.morpheme_type`,
+  each its own colour) and snap them into a single top-to-bottom stack, stem
+  first. Every block is a fixed, pre-labelled flyout entry (id + short
+  gloss) — not a dropdown — so there's no giant `<select>` and no way to
+  mistake an affix for a stem; only real morphemes of the right kind ever
+  appear in a given category. Every change re-runs oq's real `buildWord()`
+  pipeline (morphotactic grammar check → allomorphy → sandhi joins → display
+  respelling) and shows the resulting surface form live, or the reason the
+  stack doesn't yet form a legal word.
 - **Deconstruct**: type an attested Kalaallisut word; oq's `analyzeWord()`
   searches for morpheme sequences that verifiably rebuild it (each candidate
   is checked by actually running it back through `buildWord()`), and the
-  best match renders as a read-only block stack.
+  best match renders as a per-morpheme gloss breakdown (declared spelling +
+  gloss per row), not a raw list of morpheme ids.
 
-Blockly's previous/next statement connections do the enforcement for free —
-a morpheme chain is linear and order-strict (stem first, a
+Blockly's previous/next statement connections do the stack-shape enforcement
+for free — a morpheme chain is linear and order-strict (stem first, a
 `WORD_FINAL`-continuation closer last), so the block shape simply can't
 represent an illegal topology; only an illegal *adjacent join* needs
-runtime checking, which is exactly what `buildWord()` reports.
+runtime checking, which is exactly what `buildWord()` reports. Deconstruct's
+result is rendered as plain HTML rather than blocks — it's read-only with no
+drag/snap interaction to justify Blockly's overhead there, and a
+flex-wrapping row list holds up far better on a small screen than a
+read-only block stack would.
 
 ## Data sources
 
 - **Engine**: [`jandahl/oq`](https://github.com/jandahl/oq)'s experimental
   `docs/public-api.js` (`buildWord`, `analyzeWordAsync`,
-  `mergeMorphemeSources`, `morphemeEntryToPreset`, `GRAMMAR_MORPHEMES_URL`).
+  `mergeMorphemeSources`, `morphemeEntryToPreset`, `glossSummary`,
+  `GRAMMAR_MORPHEMES_URL`). Note: the richer, structured `glossSummaryItems`
+  (which carries a short, blank-filled `shortGloss` per morpheme — closer to
+  oq's own Deconstruct pill display) exists inside oq but is **not yet on
+  the exported `public-api.js` surface** at the currently-deployed
+  `API_VERSION` (0.3.0) — only the string-joining `glossSummary` is exported,
+  so that's what `breakdown.js` parses. Revisit once oq exports it.
   That module carries **no stability promise** while its `API_VERSION` is
   `0.x` — any oq commit may rename, reshape, or drop an export.
   **The `jandahl/oq` source repo is private**, so a commit-pinned CDN URL
