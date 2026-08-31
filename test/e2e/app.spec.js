@@ -428,3 +428,51 @@ test("Build: pinch-to-zoom is enabled on the workspace (bl-oq-ly#20 -- Blockly d
 	const pinchEnabled = await page.evaluate(() => Blockly.getMainWorkspace().options.zoomOptions.pinch);
 	expect(pinchEnabled).toBe(true);
 });
+
+test("Shareable links: building a chain live-updates the URL, and reloading a chain link restores the same word (router.js)", async ({ page }) => {
+	await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		for (const b of ws.getTopBlocks(false)) b.dispose(false);
+		const stem = ws.newBlock("morpheme_block__stem_n");
+		stem.data = "qimmeq";
+		stem.initSvg(); stem.render();
+		const affix = ws.newBlock("morpheme_block__deriv_affix");
+		affix.data = "N_qaq_Vb";
+		affix.initSvg(); affix.render();
+		stem.nextConnection.connect(affix.previousConnection);
+	});
+	await expect.poll(() => page.evaluate(() => location.search)).toBe("?chain=qimmeq%2CN_qaq_Vb");
+
+	const shareUrl = await page.evaluate(() => location.href);
+	const page2 = await page.context().newPage();
+	await page2.goto(shareUrl);
+	await expect(page2.locator("#status-line")).toHaveText("qimmeqaq", { timeout: 15_000 });
+	await expect(page2.locator("#mode-build")).toHaveAttribute("aria-selected", "true");
+	await page2.close();
+});
+
+test("Shareable links: a verified Deconstruct result pushes mode+word into the URL, and reloading it restores the same analysis (router.js)", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect.poll(() => page.evaluate(() => location.search)).toBe("?mode=deconstruct&word=qimmeqarpunga");
+
+	const shareUrl = await page.evaluate(() => location.href);
+	const page2 = await page.context().newPage();
+	await page2.goto(shareUrl);
+	await expect(page2.locator("#mode-deconstruct")).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
+	await expect(page2.locator("#word-input")).toHaveValue("qimmeqarpunga");
+	await expect(page2.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page2.locator(".breakdown-translation")).toHaveText("I have a dog");
+	await page2.close();
+});
+
+test("Shareable links: display options (language, spelling mode) are deliberately NOT in the URL -- they stay a per-visitor preference, not shared content", async ({ page }) => {
+	await page.selectOption("#opt-lang", "da");
+	await page.selectOption("#opt-spelling", "gloss-only");
+	await page.waitForTimeout(200);
+	const search = await page.evaluate(() => location.search);
+	expect(search).not.toContain("lang");
+	expect(search).not.toContain("spelling");
+});
