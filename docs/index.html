@@ -8,7 +8,10 @@
 </head>
 <body>
 	<header>
-		<h1>bl-oq-ly</h1>
+		<div class="header-top">
+			<h1>bl-oq-ly</h1>
+			<button id="theme-toggle" class="theme-toggle" type="button">Theme: Auto</button>
+		</div>
 		<p class="subtitle">A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.</p>
 		<div class="mode-toggle" role="tablist">
 			<button id="mode-build" role="tab" aria-selected="true" class="active">Build</button>
@@ -19,6 +22,10 @@
 	<main>
 		<section id="panel-build" class="panel active">
 			<p class="hint">Drag morpheme blocks from the palette and snap them into a single stack, stem first. The result updates as you build.</p>
+			<div class="palette-controls">
+				<button id="palette-toggle" type="button">Hide palette</button>
+				<input id="morpheme-filter" type="text" placeholder="Filter morphemes by id or gloss…" autocomplete="off" spellcheck="false" />
+			</div>
 		</section>
 
 		<section id="panel-deconstruct" class="panel">
@@ -27,7 +34,8 @@
 				<input id="word-input" type="text" placeholder="e.g. qimmeqarpoq" autocomplete="off" spellcheck="false" />
 				<button id="analyze-btn">Deconstruct</button>
 			</div>
-			<p class="hint">Type a real Kalaallisut word and see it broken into a morpheme chain. The chain is read-only — a verified rebuild, not a guess.</p>
+			<p class="hint">Type a real Kalaallisut word and see it broken into a morpheme chain. The chain is a verified rebuild, not a guess.</p>
+			<button id="move-to-builder-btn" type="button" hidden>Move to Word Builder →</button>
 		</section>
 
 		<div id="blockly-div"></div>
@@ -42,7 +50,7 @@
 		<p>
 			Consumes <a href="https://github.com/jandahl/oq">oq</a>'s experimental
 			<a href="https://github.com/jandahl/oq/blob/master/docs/public-api.md">public API</a>
-			(oq.spacepope.dk, see README) and
+			(oq.dicknog.dk, see README) and
 			<a href="https://github.com/jandahl/jandahl-custom-KAL-grammarian">jandahl-custom-KAL-grammarian</a>'s
 			published morpheme data. Not linked from oq's main app; direct-URL only, by design.
 		</p>

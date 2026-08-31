@@ -13,21 +13,33 @@ One page, two modes:
 
 - **Build**: drag morpheme blocks from a categorized Blockly toolbox (Stems
   — nouns, Stems — verbs, Derivational affixes, Inflectional endings,
-  Enclitics, ... — one category per grammarian `lexical_facts.morpheme_type`,
-  each its own colour) and snap them into a single top-to-bottom stack, stem
-  first. Every block is a fixed, pre-labelled flyout entry (id + short
-  gloss) — not a dropdown — so there's no giant `<select>` and no way to
-  mistake an affix for a stem; only real morphemes of the right kind ever
+  Enclitics, ... — one category per grammarian `lexical_facts.morpheme_type`)
+  and snap them into a single top-to-bottom stack, stem first. Each category
+  is its own Blockly block *type* (`blocks.js`'s `morpheme_block__<category>`)
+  with that category's own fixed colour set in `init()` — not one shared
+  block type with a per-instance toolbox colour override, which Blockly
+  silently ignores. Every block is a fixed, pre-labelled flyout entry (id +
+  short gloss) — not a dropdown — so there's no giant `<select>` and no way
+  to mistake an affix for a stem; only real morphemes of the right kind ever
   appear in a given category. Every change re-runs oq's real `buildWord()`
   pipeline (morphotactic grammar check → allomorphy → sandhi joins → display
   respelling) and shows the resulting surface form live, or the reason the
-  stack doesn't yet form a legal word.
+  stack doesn't yet form a legal word. A **filter box** above the palette
+  narrows the toolbox to matching id/gloss substrings live (a category with
+  no matches disappears entirely), and a **Hide/Show palette** button frees
+  the full canvas width via Blockly's `Toolbox.setVisible()` — *not*
+  `workspace.updateToolbox(null)`, which Blockly rejects once a workspace has
+  been injected with a toolbox ("Can't nullify an existing toolbox").
 - **Deconstruct**: type an attested Kalaallisut word; oq's `analyzeWord()`
   searches for morpheme sequences that verifiably rebuild it (each candidate
   is checked by actually running it back through `buildWord()`), and the
   best match renders as a per-morpheme gloss breakdown (declared spelling +
   short, blank-filled gloss per row, e.g. `-qaq — to have a dog`), not a raw
-  list of morpheme ids.
+  list of morpheme ids. A **"Move to Word Builder"** button (shown once a
+  breakdown renders) switches to Build mode and recreates the verified chain
+  as a live, editable block stack (`blocks.js`'s `renderChain()`) so the
+  learner can keep experimenting from a known-good starting point instead of
+  rebuilding it by hand.
 
 Blockly's previous/next statement connections do the stack-shape enforcement
 for free — a morpheme chain is linear and order-strict (stem first, a
@@ -38,6 +50,19 @@ result is rendered as plain HTML rather than blocks — it's read-only with no
 drag/snap interaction to justify Blockly's overhead there, and a
 flex-wrapping row list holds up far better on a small screen than a
 read-only block stack would.
+
+### Theme
+
+A three-way Auto/Light/Dark toggle (top right, persisted in `localStorage`)
+sets `<html data-theme="...">`, which `style.css` reads (an explicit choice
+always wins over the OS; "Auto" falls back to `prefers-color-scheme`). Blockly
+itself doesn't read CSS custom properties at all, so its toolbox/flyout/
+workspace chrome is themed separately via `theme.js`'s two `Blockly.Theme`
+objects and `workspace.setTheme()`, kept in sync with the page's own theme by
+`app.js` on every toggle (and live on an OS-level change, while "Auto" is
+active). An earlier version forced Blockly's toolbox text to a fixed dark
+colour via a blanket CSS override — readable, but meant Blockly's own chrome
+could never actually go dark; this replaces that hack with real theming.
 
 ## Data sources
 

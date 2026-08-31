@@ -1,7 +1,8 @@
 import { buildWord, analyzeWordAsync, glossSummaryItems } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
-import { defineMorphemeBlock, buildToolbox, topLevelChains } from "./blocks.js";
+import { defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain } from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
+import { buildBlocklyThemes } from "./theme.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
@@ -13,13 +14,63 @@ const wordInput = document.getElementById("word-input");
 const analyzeBtn = document.getElementById("analyze-btn");
 const blocklyDiv = document.getElementById("blockly-div");
 const breakdownDiv = document.getElementById("breakdown");
+const themeToggleBtn = document.getElementById("theme-toggle");
+const paletteToggleBtn = document.getElementById("palette-toggle");
+const filterInput = document.getElementById("morpheme-filter");
+const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
 
 let mode = "build";
 let presets = [];
 let presetsById = new Map();
-let toolbox = null;
+let fullToolbox = null;
 let workspace = null;
 let deconstructAbort = null;
+let paletteVisible = true;
+let lastDeconstructIds = null;
+let blocklyThemes = null;
+
+// --- Theme (bl-oq-ly#7): a real toggle, not just following the OS. Cycles
+// auto -> light -> dark -> auto. "auto" clears the override so style.css's
+// prefers-color-scheme media query decides, matching the OS as before.
+// Blockly's own toolbox/flyout/workspace chrome is themed separately via
+// theme.js + workspace.setTheme(), since it doesn't read CSS custom
+// properties at all — see that file's comment.
+const THEME_KEY = "bl-oq-ly:theme";
+const THEME_CYCLE = ["auto", "light", "dark"];
+const prefersDarkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+function isEffectivelyDark() {
+	const explicit = document.documentElement.dataset.theme;
+	if (explicit === "dark") return true;
+	if (explicit === "light") return false;
+	return prefersDarkQuery.matches;
+}
+
+function syncBlocklyTheme() {
+	if (workspace && blocklyThemes) workspace.setTheme(isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light);
+}
+
+function applyTheme(theme) {
+	if (theme === "auto") delete document.documentElement.dataset.theme;
+	else document.documentElement.dataset.theme = theme;
+	themeToggleBtn.textContent = `Theme: ${theme[0].toUpperCase()}${theme.slice(1)}`;
+	syncBlocklyTheme();
+}
+
+function initTheme() {
+	const stored = localStorage.getItem(THEME_KEY);
+	applyTheme(THEME_CYCLE.includes(stored) ? stored : "auto");
+	themeToggleBtn.addEventListener("click", () => {
+		const current = document.documentElement.dataset.theme || "auto";
+		const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
+		localStorage.setItem(THEME_KEY, next);
+		applyTheme(next);
+	});
+	// Keep "auto" reactive to a live OS theme change, not just at load time.
+	prefersDarkQuery.addEventListener("change", () => {
+		if (!document.documentElement.dataset.theme) syncBlocklyTheme();
+	});
+}
 
 function setStatus(text, kind, meta) {
 	statusEl.className = kind ?? "";
@@ -77,6 +128,8 @@ async function runDeconstruct() {
 	if (deconstructAbort) deconstructAbort.abort();
 	deconstructAbort = new AbortController();
 	breakdownDiv.innerHTML = "";
+	moveToBuilderBtn.hidden = true;
+	lastDeconstructIds = null;
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
@@ -87,11 +140,49 @@ async function runDeconstruct() {
 		const best = result.matches[0];
 		const built = buildWord(best.seq);
 		renderBreakdown(breakdownDiv, word, best.seq, built, glossSummaryItems);
+		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
+		moveToBuilderBtn.hidden = false;
 		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
 	} catch (err) {
 		if (err?.name === "AbortError") return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
+}
+
+function moveToBuilder() {
+	if (!lastDeconstructIds) return;
+	const ids = lastDeconstructIds;
+	setMode("build");
+	Blockly.svgResize(workspace);
+	renderChain(workspace, ids, presetsById);
+	workspace.scrollCenter(); // the toolbox otherwise covers a stack placed at the workspace's default (20, 20) origin
+	refreshBuild();
+}
+
+// --- Palette hide/show (bl-oq-ly#8) and filter (bl-oq-ly#9). The toolbox
+// content is rebuilt from the filtered preset list rather than hidden/shown
+// per-block, so a category with no matches disappears entirely (see
+// blocks.js's buildToolbox) instead of leaving an empty, confusing category
+// behind. Hiding the palette uses Toolbox.setVisible(), Blockly's own public
+// API for this -- NOT workspace.updateToolbox(null), which throws ("Can't
+// nullify an existing toolbox"): updateToolbox only supports swapping a
+// toolbox's *content*, never removing one already injected with a toolbox.
+function closeOpenFlyout() {
+	workspace?.getToolbox()?.getFlyout()?.hide();
+}
+
+function applyToolbox() {
+	if (!workspace) return;
+	workspace.getToolbox()?.setVisible(paletteVisible);
+	closeOpenFlyout();
+	if (!paletteVisible) return;
+
+	const q = filterInput.value.trim().toLowerCase();
+	const filtered = q
+		? presets.filter((p) => p.id.toLowerCase().includes(q) || (p.glossShort || p.gloss || "").toLowerCase().includes(q))
+		: presets;
+	workspace.updateToolbox(q ? buildToolbox(filtered) : fullToolbox);
+	closeOpenFlyout();
 }
 
 function setMode(next) {
@@ -106,26 +197,29 @@ function setMode(next) {
 	breakdownDiv.hidden = next !== "deconstruct";
 
 	if (next === "build") {
-		workspace.clear();
 		requestAnimationFrame(() => Blockly.svgResize(workspace));
 		setStatus("Drag a morpheme block in to begin.", "");
 	} else {
 		breakdownDiv.innerHTML = "";
+		moveToBuilderBtn.hidden = true;
 		setStatus("Type a word and press Deconstruct.", "");
 	}
 }
 
 async function main() {
+	blocklyThemes = buildBlocklyThemes();
+	initTheme();
 	setStatus("Loading morpheme catalog…", "");
 	const catalog = await loadCatalog();
 	presets = catalog.presets;
 	presetsById = new Map(presets.map((p) => [p.id, p]));
 
-	defineMorphemeBlock();
-	toolbox = buildToolbox(presets);
+	defineMorphemeBlocks();
+	fullToolbox = buildToolbox(presets);
 
 	workspace = Blockly.inject(blocklyDiv, {
-		toolbox,
+		toolbox: fullToolbox,
+		theme: isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light,
 		trashcan: true,
 		zoom: { controls: true, wheel: true },
 		move: { scrollbars: true, drag: true, wheel: true },
@@ -143,6 +237,16 @@ async function main() {
 	wordInput.addEventListener("keydown", (e) => {
 		if (e.key === "Enter") runDeconstruct();
 	});
+	moveToBuilderBtn.addEventListener("click", moveToBuilder);
+
+	paletteToggleBtn.addEventListener("click", () => {
+		paletteVisible = !paletteVisible;
+		paletteToggleBtn.textContent = paletteVisible ? "Hide palette" : "Show palette";
+		filterInput.hidden = !paletteVisible;
+		applyToolbox();
+		requestAnimationFrame(() => Blockly.svgResize(workspace));
+	});
+	filterInput.addEventListener("input", applyToolbox);
 }
 
 main().catch((err) => {

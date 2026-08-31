@@ -10,8 +10,11 @@
 	--approx: #a06a00;
 }
 
+/* "auto" (no explicit override) follows the OS; an explicit light/dark
+   choice from the theme toggle (app.js, stored in localStorage) always
+   wins over the OS via the [data-theme] attribute on <html>. */
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme="light"]) {
 		--bg: #16181a;
 		--fg: #ece7dd;
 		--accent: #5fb8b8;
@@ -21,6 +24,16 @@
 		--ok: #7fd99a;
 		--approx: #ffcc66;
 	}
+}
+:root[data-theme="dark"] {
+	--bg: #16181a;
+	--fg: #ece7dd;
+	--accent: #5fb8b8;
+	--border: #3a3d3f;
+	--panel-bg: #1f2224;
+	--error: #ff8a80;
+	--ok: #7fd99a;
+	--approx: #ffcc66;
 }
 
 * { box-sizing: border-box; }
@@ -41,7 +54,18 @@ header {
 	border-bottom: 1px solid var(--border);
 }
 
+.header-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 h1 { margin: 0 0 0.2rem; font-size: 1.2rem; }
+.theme-toggle {
+	padding: 0.3rem 0.6rem;
+	border: 1px solid var(--border);
+	background: var(--panel-bg);
+	color: var(--fg);
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.75rem;
+	touch-action: manipulation;
+}
 .subtitle { margin: 0 0 0.6rem; color: color-mix(in srgb, var(--fg) 65%, transparent); font-size: 0.8rem; }
 
 .mode-toggle { display: flex; gap: 0.5rem; }
@@ -95,23 +119,52 @@ main {
 	touch-action: manipulation;
 }
 
-/* Blockly's toolbox/flyout tree is plain HTML with its own light chrome and
-   no CSS-variable theming hook — it doesn't expect to inherit our dark-mode
-   page text colour, and light text on its light background is unreadable
-   (bl-oq-ly#5). Force a fixed dark colour for everything inside the canvas
-   container; block/text glyphs inside the SVG workspace itself are painted
-   via Blockly's own `fill` attributes, not CSS `color`, so this is safe. */
-#blockly-div, #blockly-div * {
-	color: #1c1a16;
+#move-to-builder-btn {
+	padding: 0.5rem 1rem;
+	border: 1px solid var(--accent);
+	background: transparent;
+	color: var(--accent);
+	border-radius: 4px;
+	cursor: pointer;
+	font-weight: 600;
+	margin-top: 0.5rem;
+	touch-action: manipulation;
 }
+#move-to-builder-btn[hidden] { display: none; }
 
+.palette-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
+.palette-controls button {
+	padding: 0.4rem 0.7rem;
+	border: 1px solid var(--border);
+	background: var(--panel-bg);
+	color: var(--fg);
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.8rem;
+	touch-action: manipulation;
+}
+.palette-controls input {
+	flex: 1 1 12rem;
+	min-width: 0;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	font-size: 0.9rem;
+	background: var(--panel-bg);
+	color: var(--fg);
+}
+.palette-controls input[hidden] { display: none; }
+
+/* Blockly's toolbox/flyout/workspace chrome is themed via the supported
+   Blockly.Theme API (theme.js) rather than CSS, and kept in sync with this
+   page's own theme by app.js's workspace.setTheme() calls — see theme.js's
+   comment for why (Blockly doesn't read CSS custom properties). */
 #blockly-div {
 	height: min(55vh, 480px);
 	min-height: 280px;
 	width: 100%;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: var(--panel-bg);
 }
 #blockly-div[hidden] { display: none; }
 
