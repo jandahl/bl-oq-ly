@@ -188,6 +188,32 @@ main {
 }
 #blockly-div[hidden] { display: none; }
 
+/* bl-oq-ly#20: on a phone-width viewport, Blockly's own toolbox tree sizes
+   itself to its longest category label ("Derivational affixes (576)") --
+   measured at ~60% of #blockly-div's own width on a 390px-wide viewport,
+   leaving well under half the already-narrow canvas actually visible even
+   before a category's flyout opens on top of it. Capping the tree's width
+   and truncating an overflowing label (rather than letting it force the
+   container wider) gives real canvas room back; the category is still
+   fully readable via its own native title tooltip Blockly already sets, and
+   the "(NNN)" entry count -- the more load-bearing half of the label on a
+   cramped screen -- stays visible since it's what determines the label's
+   own right edge. This is layout only (width/overflow), never colour/font
+   weight/etc., which stay owned by theme.js's Blockly.Theme API per the
+   comment above -- CSS is the only lever Blockly exposes for the toolbox
+   container's own dimensions, unlike block/flyout chrome. */
+@media (max-width: 480px) {
+	.blocklyToolboxDiv { max-width: 42vw; }
+	.blocklyTreeRow { overflow: hidden; }
+	/* A smaller font, not ellipsis-truncation: the "(NNN)" entry count is the
+	   more load-bearing half of a cramped label (it's what tells a learner
+	   whether a category is worth opening at all), and clipping arrives with
+	   no visible "…" cue here (Blockly's own label markup doesn't support
+	   text-overflow the way a plain block-level element does) -- a clipped
+	   "Stems — nouns (21" reads as broken, not as "there's more here." */
+	.blocklyTreeLabel { font-size: 0.75rem; }
+}
+
 #breakdown {
 	max-height: min(55vh, 480px);
 	overflow-y: auto;

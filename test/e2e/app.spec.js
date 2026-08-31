@@ -315,6 +315,55 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 	expect(chain).toEqual([["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"]]);
 	await expect(page.locator("#status")).toHaveClass(/ok/);
 	await expect(page.locator("#reading-line")).toHaveText("I have a dog");
+
+	// The ending block must be a real, adjustable picker instance -- not a
+	// frozen label block with no dropdown at all (user report: a restored
+	// ending had no way to change its mood/person short of deleting it and
+	// dragging a fresh picker from the toolbox).
+	const endingBlock = await page.evaluate(() => {
+		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
+		return block && { data: block.data, mood: block.getFieldValue("MOOD"), moodOptionCount: block.getField("MOOD").getOptions().length };
+	});
+	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9 });
+});
+
+test("Build: a restored verb ending block (Move to Word Builder) stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await page.click("#move-to-builder-btn");
+	await page.waitForTimeout(500);
+
+	const afterChange = await page.evaluate(() => {
+		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
+		block.setFieldValue("optative", "MOOD");
+		return { data: block.data, resolved: block.getFieldValue("RESOLVED") };
+	});
+	expect(afterChange.data).toBe("V_OPT_INTR_1SG");
+	expect(afterChange.resolved).not.toContain("no such ending");
+	await expect(page.locator("#status")).toHaveClass(/ok/);
+});
+
+test("Shareable links: a chain link naming one of the duplicate-coordinate variants (V_CONTNEG_1SG) restores that exact variant, not just the first candidate", async ({ page }) => {
+	// A fresh page/context for this navigation, not a second goto() on the
+	// beforeEach's own `page` -- a repeat same-origin fetch of oq's
+	// public-api.js can legitimately come back 304 (cache revalidation) on
+	// CI's real network, which beforeEach's response.ok() check (correctly)
+	// treats as worth investigating for every OTHER resource, but not this
+	// one: 304 is not a failure here, just a second load in one browser
+	// session. Matches the pattern the other Shareable-links tests already
+	// use for exactly this reason.
+	const page2 = await page.context().newPage();
+	page2.on("pageerror", (err) => { throw new Error(`Unexpected uncaught page error: ${err.message}`); });
+	await page2.goto("/?chain=neri,V_CONTNEG_1SG");
+	await expect(page2.locator("#status-line")).toHaveText("nerinanga", { timeout: 20_000 });
+	const block = await page2.evaluate(() => {
+		const b = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
+		return b && { data: b.data, variant: b.getFieldValue("VARIANT") };
+	});
+	expect(block).toEqual({ data: "V_CONTNEG_1SG", variant: "V_CONTNEG_1SG" });
+	await page2.close();
 });
 
 test("Shareable links: building a chain live-updates the URL, and reloading a chain link restores the same word (router.js)", async ({ page }) => {
@@ -363,4 +412,19 @@ test("Shareable links: display options (language, spelling mode) are deliberatel
 	const search = await page.evaluate(() => location.search);
 	expect(search).not.toContain("lang");
 	expect(search).not.toContain("spelling");
+});
+
+test("Build: on a phone-width viewport, the toolbox tree stays a minority of the canvas width instead of dominating it (bl-oq-ly#20)", async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 700 });
+	await page.waitForTimeout(200);
+	const { blocklyDivWidth, toolboxDivWidth } = await page.evaluate(() => ({
+		blocklyDivWidth: document.querySelector("#blockly-div").getBoundingClientRect().width,
+		toolboxDivWidth: document.querySelector(".blocklyToolboxDiv").getBoundingClientRect().width,
+	}));
+	expect(toolboxDivWidth / blocklyDivWidth).toBeLessThan(0.5);
+});
+
+test("Build: pinch-to-zoom is enabled on the workspace (bl-oq-ly#20 -- Blockly doesn't turn this on by default)", async ({ page }) => {
+	const pinchEnabled = await page.evaluate(() => Blockly.getMainWorkspace().options.zoomOptions.pinch);
+	expect(pinchEnabled).toBe(true);
 });

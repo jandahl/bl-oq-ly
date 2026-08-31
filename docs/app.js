@@ -395,7 +395,15 @@ async function main() {
 		toolbox: buildToolbox(presets, displayOptions()),
 		theme: isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light,
 		trashcan: true,
-		zoom: { controls: true, wheel: true },
+		// pinch: true (bl-oq-ly#20) -- a touch pinch gesture zooms the
+		// workspace, same as the on-screen +/- controls/mouse wheel above.
+		// Without it, a phone-width viewport has no way to zoom the canvas at
+		// all: the toolbox tree + its flyout can together take up the whole
+		// visible width once a category is open (see style.css's own
+		// #blockly-div media-query comment), and pinch is the natural mobile
+		// gesture a learner reaches for to work around that -- Blockly
+		// doesn't enable it by default.
+		zoom: { controls: true, wheel: true, pinch: true },
 		move: { scrollbars: true, drag: true, wheel: true },
 	});
 	workspace.addChangeListener(() => refreshBuild());

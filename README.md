@@ -188,6 +188,25 @@ network-backed re-export of oq's public API) rather than imported directly
 by `verb-endings.js`/`blocks.js`, so those two stay plain, dependency-free
 and unit-testable under Node.
 
+A verb ending block placed on the canvas any other way -- Deconstruct's
+"Move to Word Builder," or restoring a shared `?chain=...` link -- is a real
+picker instance too, its fields set to match that exact id (including the
+variant dropdown, for one of the ~23 duplicate-coordinate ids), not a
+frozen label with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s
+`renderChain()` builds these via `restoreVerbPickerFields()`.
+
+### Mobile
+
+- **Pinch-to-zoom** is enabled on the Blockly workspace (`zoom.pinch` at
+  injection) — Blockly doesn't turn this on by default, and a phone-width
+  viewport otherwise has no way to zoom the canvas at all (bl-oq-ly#20).
+- The toolbox tree's own width is capped on a narrow viewport (≤480px),
+  with a smaller label font rather than truncation — Blockly sizes the tree
+  to its longest category label ("Derivational affixes (576)") by default,
+  which measured out to ~60% of the canvas width on a 390px-wide phone,
+  leaving well under half the already-narrow view actually usable even
+  before a category's flyout opens on top of it.
+
 ### Directional connections
 
 A stem's block has no `previousConnection` at all (nothing can ever precede

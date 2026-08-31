@@ -343,6 +343,61 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 
 export { VERB_ENDING_PICKER_TYPE };
 
+/** True when `preset` is a real verb-mood inflectional ending -- one of the
+ * ~278 entries carrying a structured `inflection.subject` (paradigm
+ * coordinates), as opposed to a case/possession ending or anything else.
+ * Shared by buildToolbox() (which excludes these from the flat list) and
+ * renderChain() (which needs to know to build a picker instance, not a
+ * plain block, for one of these) so the two conditions can't drift apart. */
+function isVerbEndingPreset(preset) {
+	return preset.morpheme_type === "inflectional_ending" && Boolean(preset.seq?.[0]?.inflection?.subject);
+}
+
+/** "person|number" combo string in the same format the picker's SUBJECT/
+ * OBJECT fields use (see verb-endings.js's personNumberKey/parsePersonNumber). */
+function comboKey(person, number) {
+	return `${person}|${number}`;
+}
+
+/**
+ * Sets a freshly-created verb ending picker block's fields to match a
+ * specific real morpheme id -- mood, transitivity, subject, object, and
+ * (when `preset.id` is one of the ~23 that share paradigm coordinates with
+ * another ending) the right VARIANT -- so the block stays as adjustable as
+ * if it had been dragged fresh from the toolbox, rather than a frozen,
+ * non-interactive stand-in for that one id. `block` must already be
+ * initSvg()'d/render()'d (each setFieldValue below fires the field's own
+ * validator, which re-renders as it goes -- see resolveVerbPicker's own
+ * `if (block.rendered)` guard).
+ */
+function restoreVerbPickerFields(block, preset) {
+	const inflection = preset.seq[0].inflection;
+	block.setFieldValue(inflection.mood, "MOOD");
+	block.setFieldValue(inflection.transitivity, "TRANS");
+	block.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "SUBJECT");
+	if (inflection.object) block.setFieldValue(comboKey(inflection.object.person, inflection.object.number), "OBJECT");
+	// Only the paradigm coordinates above are guaranteed to already resolve
+	// to `preset.id` -- when they resolve to more than one candidate (a
+	// duplicate-coordinate combination), the variant dropdown defaults to
+	// its first option, which isn't necessarily the specific id being
+	// restored, so pick it explicitly.
+	const variantField = block.getField("VARIANT");
+	if (block.data !== preset.id && block.getInput("VARIANT_GROUP")?.isVisible() && variantField) {
+		// Blockly's FieldDropdown caches its (dynamic, function-generated)
+		// menu and validates a setValue() call against that cache -- the
+		// SUBJECT/OBJECT field-change above is what populated
+		// block.verbPickerState.candidateOptions with this combination's
+		// real candidates, but the VARIANT field's own cached option list
+		// was last generated back when it was still just [["—","NONE"]]
+		// (block creation). Without forcing a refresh here, setFieldValue()
+		// below silently no-ops -- preset.id isn't among the STALE cached
+		// options -- leaving the field (and block.data) on whichever
+		// candidate happened to resolve first, not the one being restored.
+		variantField.getOptions(false);
+		block.setFieldValue(preset.id, "VARIANT");
+	}
+}
+
 /**
  * Builds a categorized Blockly toolbox from (optionally filtered) presets.
  * A category with no matching presets is omitted entirely, which is what
@@ -362,7 +417,7 @@ export { VERB_ENDING_PICKER_TYPE };
 export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker = true } = {}) {
 	const byCategoryName = new Map();
 	for (const preset of presets) {
-		if (preset.morpheme_type === "inflectional_ending" && preset.seq?.[0]?.inflection?.subject) continue;
+		if (isVerbEndingPreset(preset)) continue;
 		const cat = categoryForPreset(preset);
 		if (!byCategoryName.has(cat.name)) byCategoryName.set(cat.name, { ...cat, presets: [] });
 		byCategoryName.get(cat.name).presets.push(preset);
@@ -418,14 +473,20 @@ export function topLevelChains(workspace) {
 /**
  * Programmatically builds an editable stack of real morpheme blocks for
  * `ids` (stem first) on `workspace`, replacing whatever stack is already
- * there. Used by Deconstruct's "Move to Word Builder" (app.js): the learner
- * gets the verified chain as a live, editable stack to keep experimenting
- * with, not a static read-only display. Always lays out stem-first — see
- * app.js's own comment on why "read last-morpheme-first" doesn't flip the
- * physical block stack, only Deconstruct's row order and Build's separate
- * reading-order line. Uses the plain per-category block type even for a
- * verb ending (never the picker widget) — the picker is a toolbox authoring
- * convenience, not the canonical on-canvas representation of an id.
+ * there. Used by Deconstruct's "Move to Word Builder" and by a restored
+ * shareable-URL chain link (app.js): the learner gets the verified chain as
+ * a live, editable stack to keep experimenting with, not a static read-only
+ * display. Always lays out stem-first — see app.js's own comment on why
+ * "read last-morpheme-first" doesn't flip the physical block stack, only
+ * Deconstruct's row order and Build's separate reading-order line.
+ *
+ * A verb-mood ending gets a real, fully-adjustable picker instance (its
+ * fields set to match that exact id, via restoreVerbPickerFields()), not the
+ * plain frozen label block every other category uses -- an earlier version
+ * of this function always used the plain block even here, on the reasoning
+ * that the picker was purely a toolbox authoring convenience; real usage
+ * showed that left a restored ending with no way to adjust it at all short
+ * of deleting and re-dragging a fresh picker from the toolbox.
  */
 export function renderChain(workspace, ids, presetsById, displayOptions) {
 	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
@@ -433,12 +494,15 @@ export function renderChain(workspace, ids, presetsById, displayOptions) {
 	for (const id of ids) {
 		const preset = presetsById.get(id);
 		if (!preset) continue;
-		const cat = categoryForPreset(preset);
-		const block = workspace.newBlock(blockTypeForCategory(cat));
-		block.data = id;
-		block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
+		const isVerbEnding = isVerbEndingPreset(preset);
+		const block = workspace.newBlock(isVerbEnding ? VERB_ENDING_PICKER_TYPE : blockTypeForCategory(categoryForPreset(preset)));
+		if (!isVerbEnding) {
+			block.data = id;
+			block.setFieldValue(labelFor(preset, displayOptions), "LABEL");
+		}
 		block.initSvg();
 		block.render();
+		if (isVerbEnding) restoreVerbPickerFields(block, preset);
 		if (prev) {
 			prev.nextConnection.connect(block.previousConnection);
 		} else {
