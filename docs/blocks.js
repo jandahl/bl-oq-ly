@@ -17,20 +17,43 @@
 // apply — bl-oq-ly#6) gives every block its category's own colour reliably,
 // since Blockly always honours setColour() called from a block's own init().
 //
-// Directional connections (bl-oq-ly#11): a stem is always the leftmost
-// morpheme, so its block has no previousConnection at all — Blockly simply
-// won't let anything snap above it, catching that class of illegal stack at
-// drag time instead of only after the fact via buildWord(). Symmetrically,
-// a WORD_FINAL-closing morpheme (an ordinary inflectional ending or plain
-// enclitic; NOT a derivational_enclitic, which grammarian's own schema
-// documents as not sealing the word) has no nextConnection, so nothing can
-// snap below it. This only encodes the two structural cases that are always
-// true regardless of which specific morpheme is involved; it deliberately
-// does not attempt to re-encode morphotactics.js's full join-legality rules
-// (continuation_class-vs-continuation_class compatibility, category shifts,
-// derivational_prefix's own attachment site) as Blockly connection checks —
-// that's real engine logic that belongs in oq, not duplicated here, and
-// buildWord() already reports it live once a stack is built.
+// Directional connections (bl-oq-ly#11, corrected bl-oq-ly#15): encodes the
+// subset of oq's real join-legality engine (morphotactics.js's canFollow())
+// that's always true regardless of which specific morpheme is involved,
+// structurally, via Blockly's own connection system:
+//   - a stem is always the leftmost morpheme (canFollow: "a stem can only
+//     begin a word") -- no previousConnection at all.
+//   - a particle is a free-standing word: it can only be the SOLE item of a
+//     sequence, nothing may precede or follow it, not even another particle
+//     -- no previousConnection AND no nextConnection.
+//   - a plain enclitic always seals the word once attached (nothing but
+//     another enclitic-family morpheme could follow, and Blockly's static
+//     per-category check strings can't express "only these specific
+//     categories," so this is drawn conservatively at "nothing") -- no
+//     nextConnection.
+// An ordinary WORD_FINAL inflectional ending does NOT get this treatment
+// (an earlier version of this file wrongly disabled its nextConnection too)
+// -- morphotactics.js's CLOSED_BYPASS_TYPES explicitly allows an enclitic or
+// derivational_enclitic to attach onto an already-closed word, e.g. a
+// finite verb ending followed by an enclitic, a real and common
+// construction. A derivational_enclitic keeps both connections for the same
+// reason it's exempt from CLOSED_BYPASS_TYPES's usual sealing: grammarian's
+// own schema documents it as NOT closing the word, so further affixes/
+// endings can still follow.
+//
+// What this deliberately does NOT encode: category_shift's N/V typed pipe
+// (a derivational affix's input class must match the running word's current
+// class, and its output class becomes the new running class), or the
+// separate valency-scale compatibility checks (semanticCompatibility()).
+// Both are real, well-structured rules -- worth a proper typed-connector
+// treatment (Blockly connection `check` arrays keyed on N/V, rather than
+// the single shared "MORPHEME_CHAIN" string every category uses today) if
+// this ever becomes a second pass, but that's a materially bigger change:
+// the check would need to be per-PRESET (derived from that preset's own
+// category_shift), not per-CATEGORY like everything here, since e.g.
+// "Derivational affixes" mixes N->V, V->N, N->N, and V->V entries. Until
+// then, buildWord() reports the wrong-word-class case live once a stack is
+// built, same as any other join-legality rejection.
 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
@@ -45,11 +68,11 @@ const CATEGORY_ORDER = [
 	{ key: "stem", wordClass: "", id: "stem_other", name: "Stems — other", colour: 220, hasPrevious: false },
 	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colour: 20 },
 	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colour: 30 },
-	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colour: 130, hasNext: false },
+	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colour: 130 },
 	{ key: "enclitic", id: "enclitic", name: "Enclitics", colour: 290, hasNext: false },
 	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colour: 300 },
 	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colour: 60 },
-	{ key: "particle", id: "particle", name: "Particles", colour: 0 },
+	{ key: "particle", id: "particle", name: "Particles", colour: 0, hasPrevious: false, hasNext: false },
 ];
 const FALLBACK_CATEGORY = { key: "other", id: "other", name: "Other", colour: 0 };
 
