@@ -57,10 +57,12 @@ runtime checking, which is exactly what `buildWord()` reports.
 
 ## Running locally
 
-No build step. Any static file server works, e.g.:
+No build step. The site lives in `docs/` (so GitHub Pages can publish
+straight from `master`/`docs`, no Actions workflow needed). Any static file
+server works, e.g.:
 
 ```bash
-python3 -m http.server 8000
+cd docs && python3 -m http.server 8000
 ```
 
 Then open `http://localhost:8000/`. (A plain `file://` open won't work —
