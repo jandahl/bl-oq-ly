@@ -86,6 +86,16 @@ h1 { margin: 0 0 0.2rem; font-size: 1.2rem; }
 	font-weight: 600;
 }
 
+.view-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 1rem;
+	margin-top: 0.5rem;
+	font-size: 0.8rem;
+}
+.view-options label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.view-options input { cursor: pointer; }
+
 main {
 	padding: 0.75rem 1rem;
 	display: flex;
@@ -212,11 +222,34 @@ main {
 	font-size: 0.9rem;
 }
 
+/* A mood-marking morpheme's own grammatical category (statement, question,
+   ...) rendered as its own tag rather than folded into the gloss text, so
+   it reads as an annotation rather than one more piece of translation
+   (bl-oq-ly#12 — see breakdown.js's splitMoodLabel). */
+.breakdown-mood {
+	font-size: 0.75rem;
+	font-style: italic;
+	padding: 0.1rem 0.4rem;
+	border: 1px solid var(--accent);
+	border-radius: 999px;
+	color: var(--accent);
+}
+
 .breakdown-note {
 	margin-top: 0.75rem;
 	font-size: 0.8rem;
 	color: var(--approx);
 }
+
+.reading-line {
+	margin: 0;
+	padding: 0.5rem 0.9rem;
+	font-style: italic;
+	font-size: 0.9rem;
+	color: color-mix(in srgb, var(--fg) 75%, transparent);
+	border-left: 3px solid var(--accent);
+}
+.reading-line[hidden] { display: none; }
 
 #status {
 	padding: 0.6rem 0.9rem;

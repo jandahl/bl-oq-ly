@@ -16,6 +16,21 @@
 // per-instance toolbox colour override, which Blockly doesn't actually
 // apply — bl-oq-ly#6) gives every block its category's own colour reliably,
 // since Blockly always honours setColour() called from a block's own init().
+//
+// Directional connections (bl-oq-ly#11): a stem is always the leftmost
+// morpheme, so its block has no previousConnection at all — Blockly simply
+// won't let anything snap above it, catching that class of illegal stack at
+// drag time instead of only after the fact via buildWord(). Symmetrically,
+// a WORD_FINAL-closing morpheme (an ordinary inflectional ending or plain
+// enclitic; NOT a derivational_enclitic, which grammarian's own schema
+// documents as not sealing the word) has no nextConnection, so nothing can
+// snap below it. This only encodes the two structural cases that are always
+// true regardless of which specific morpheme is involved; it deliberately
+// does not attempt to re-encode morphotactics.js's full join-legality rules
+// (continuation_class-vs-continuation_class compatibility, category shifts,
+// derivational_prefix's own attachment site) as Blockly connection checks —
+// that's real engine logic that belongs in oq, not duplicated here, and
+// buildWord() already reports it live once a stack is built.
 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
@@ -23,14 +38,15 @@ const BLOCK_TYPE_PREFIX = "morpheme_block__";
 // grammarian's lexical_facts.morpheme_type enum (verified against the live
 // published catalog — see README's "Morpheme catalog" note). Order here is
 // the toolbox category order, roughly composition order (stem first).
+// hasPrevious/hasNext default to true when omitted.
 const CATEGORY_ORDER = [
-	{ key: "stem", wordClass: "N", id: "stem_n", name: "Stems — nouns", colour: 200 },
-	{ key: "stem", wordClass: "V", id: "stem_v", name: "Stems — verbs", colour: 210 },
-	{ key: "stem", wordClass: "", id: "stem_other", name: "Stems — other", colour: 220 },
+	{ key: "stem", wordClass: "N", id: "stem_n", name: "Stems — nouns", colour: 200, hasPrevious: false },
+	{ key: "stem", wordClass: "V", id: "stem_v", name: "Stems — verbs", colour: 210, hasPrevious: false },
+	{ key: "stem", wordClass: "", id: "stem_other", name: "Stems — other", colour: 220, hasPrevious: false },
 	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colour: 20 },
 	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colour: 30 },
-	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colour: 130 },
-	{ key: "enclitic", id: "enclitic", name: "Enclitics", colour: 290 },
+	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colour: 130, hasNext: false },
+	{ key: "enclitic", id: "enclitic", name: "Enclitics", colour: 290, hasNext: false },
 	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colour: 300 },
 	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colour: 60 },
 	{ key: "particle", id: "particle", name: "Particles", colour: 0 },
@@ -47,20 +63,22 @@ function blockTypeForCategory(cat) {
 	return BLOCK_TYPE_PREFIX + cat.id;
 }
 
-function labelFor(preset) {
+/** @param {boolean} showIds - bl-oq-ly#10: hide grammarian's internal ids (e.g. "V_IND_INTR_1SG") by default */
+function labelFor(preset, showIds) {
 	const gloss = preset.glossShort || preset.gloss || "(no gloss)";
-	return `${preset.id} — ${gloss}`.slice(0, 60);
+	const label = showIds ? `${preset.id} — ${gloss}` : gloss;
+	return label.slice(0, 60);
 }
 
-/** Registers one Blockly block type per category, each with that category's own colour. */
+/** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
 export function defineMorphemeBlocks() {
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
 		Blockly.Blocks[blockTypeForCategory(cat)] = {
 			init() {
 				this.appendDummyInput()
 					.appendField(new Blockly.FieldLabelSerializable(""), "LABEL");
-				this.setPreviousStatement(true, CONNECTION_TYPE);
-				this.setNextStatement(true, CONNECTION_TYPE);
+				this.setPreviousStatement(cat.hasPrevious !== false, CONNECTION_TYPE);
+				this.setNextStatement(cat.hasNext !== false, CONNECTION_TYPE);
 				this.setColour(cat.colour);
 			},
 		};
@@ -77,7 +95,7 @@ function isMorphemeBlockType(type) {
  * makes the Build-panel filter box (app.js) feel live: typing narrows which
  * categories even appear, not just their contents.
  */
-export function buildToolbox(presets) {
+export function buildToolbox(presets, showIds) {
 	const byCategoryName = new Map();
 	for (const preset of presets) {
 		const cat = categoryForPreset(preset);
@@ -99,7 +117,7 @@ export function buildToolbox(presets) {
 					kind: "block",
 					type: blockType,
 					data: preset.id,
-					fields: { LABEL: labelFor(preset) },
+					fields: { LABEL: labelFor(preset, showIds) },
 				}));
 			return {
 				kind: "category",
@@ -136,9 +154,12 @@ export function topLevelChains(workspace) {
  * `ids` (stem first) on `workspace`, replacing whatever stack is already
  * there. Used by Deconstruct's "Move to Word Builder" (app.js): the learner
  * gets the verified chain as a live, editable stack to keep experimenting
- * with, not a static read-only display.
+ * with, not a static read-only display. Always lays out stem-first — see
+ * app.js's own comment on why "read last-morpheme-first" doesn't flip the
+ * physical block stack, only Deconstruct's row order and Build's separate
+ * reading-order line.
  */
-export function renderChain(workspace, ids, presetsById) {
+export function renderChain(workspace, ids, presetsById, showIds) {
 	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
 	let prev = null;
 	for (const id of ids) {
@@ -147,7 +168,7 @@ export function renderChain(workspace, ids, presetsById) {
 		const cat = categoryForPreset(preset);
 		const block = workspace.newBlock(blockTypeForCategory(cat));
 		block.data = id;
-		block.setFieldValue(labelFor(preset), "LABEL");
+		block.setFieldValue(labelFor(preset, showIds), "LABEL");
 		block.initSvg();
 		block.render();
 		if (prev) {
@@ -156,5 +177,14 @@ export function renderChain(workspace, ids, presetsById) {
 			block.moveBy(20, 20);
 		}
 		prev = block;
+	}
+}
+
+/** Re-labels every morpheme block already on the canvas — used when the "show ids" toggle changes mid-session. */
+export function relabelBlocks(workspace, presetsById, showIds) {
+	for (const block of workspace.getAllBlocks(false)) {
+		if (!isMorphemeBlockType(block.type) || !block.data) continue;
+		const preset = presetsById.get(block.data);
+		if (preset) block.setFieldValue(labelFor(preset, showIds), "LABEL");
 	}
 }

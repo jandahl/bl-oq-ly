@@ -1,6 +1,6 @@
 import { buildWord, analyzeWordAsync, glossSummaryItems } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
-import { defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain } from "./blocks.js";
+import { defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks } from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 
@@ -18,16 +18,72 @@ const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterInput = document.getElementById("morpheme-filter");
 const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
+const showIdsCheckbox = document.getElementById("opt-show-ids");
+const readingOrderCheckbox = document.getElementById("opt-reading-order");
+const readingLine = document.getElementById("reading-line");
 
 let mode = "build";
 let presets = [];
 let presetsById = new Map();
-let fullToolbox = null;
 let workspace = null;
 let deconstructAbort = null;
 let paletteVisible = true;
 let lastDeconstructIds = null;
 let blocklyThemes = null;
+let lastBuildSeq = null;
+let lastDeconstructWord = "";
+let lastDeconstructSeq = null;
+let lastDeconstructBuilt = null;
+
+// --- Display options (bl-oq-ly#10, #11), persisted like the theme.
+const SHOW_IDS_KEY = "bl-oq-ly:show-ids";
+const READING_ORDER_KEY = "bl-oq-ly:reading-order";
+
+function showIds() {
+	return showIdsCheckbox.checked;
+}
+
+function readLastFirst() {
+	return readingOrderCheckbox.checked;
+}
+
+function initDisplayOptions() {
+	showIdsCheckbox.checked = localStorage.getItem(SHOW_IDS_KEY) === "true";
+	readingOrderCheckbox.checked = localStorage.getItem(READING_ORDER_KEY) !== "false"; // default on
+	showIdsCheckbox.addEventListener("change", () => {
+		localStorage.setItem(SHOW_IDS_KEY, String(showIdsCheckbox.checked));
+		if (workspace) relabelBlocks(workspace, presetsById, showIds());
+		applyToolbox();
+	});
+	readingOrderCheckbox.addEventListener("change", () => {
+		localStorage.setItem(READING_ORDER_KEY, String(readingOrderCheckbox.checked));
+		refreshBuild();
+		if (lastDeconstructIds) rerenderBreakdown();
+	});
+}
+
+/**
+ * Physically flipping the Blockly block stack to visually read
+ * ending-first would conflict with two things that must stay stem-first:
+ * buildWord()'s own required sequence order, and the one-directional
+ * connection constraints in blocks.js (a stem has no previousConnection,
+ * a word-final ending has no nextConnection) that make an illegal stack
+ * physically un-attachable. So "read last morpheme first" only reverses
+ * *display* -- Deconstruct's row order, and this separate reading-order
+ * line under Build's status box -- never the block stack's own construction
+ * order or direction.
+ */
+function updateReadingLine(seq) {
+	if (!seq) {
+		readingLine.hidden = true;
+		return;
+	}
+	let items = glossSummaryItems(seq).filter((item) => item.marker !== "Ø");
+	if (readLastFirst()) items = items.slice().reverse();
+	const phrase = items.map((item) => item.shortGloss || item.gloss || item.meaning || "?").join(" · ");
+	readingLine.textContent = phrase;
+	readingLine.hidden = false;
+}
 
 // --- Theme (bl-oq-ly#7): a real toggle, not just following the OS. Cycles
 // auto -> light -> dark -> auto. "auto" clears the override so style.css's
@@ -100,26 +156,41 @@ function refreshBuild() {
 	const chains = topLevelChains(workspace);
 	if (chains.length === 0) {
 		setStatus("Drag a morpheme block in to begin.", "");
+		lastBuildSeq = null;
+		updateReadingLine(null);
 		return;
 	}
 	if (chains.length > 1) {
 		setStatus("More than one stack on the canvas — combine into a single stack.", "error");
+		lastBuildSeq = null;
+		updateReadingLine(null);
 		return;
 	}
 	const ids = chains[0];
 	const seq = seqForChain(ids);
 	if (!seq) {
 		setStatus("Unknown morpheme in stack.", "error");
+		lastBuildSeq = null;
+		updateReadingLine(null);
 		return;
 	}
 	const result = buildWord(seq);
 	if (!result.ok) {
 		setStatus(`✗ ${result.reason || "invalid sequence"}`, "error", `at position ${result.errorAt >= 0 ? result.errorAt + 1 : "?"}`);
+		lastBuildSeq = null;
+		updateReadingLine(null);
 		return;
 	}
 	const prefix = result.approximate ? "≈ " : "";
 	const kind = result.approximate ? "approx" : "ok";
 	setStatus(`${prefix}${result.word}`, kind, result.closed ? "complete word" : "mid-derivation — keep building");
+	lastBuildSeq = seq;
+	updateReadingLine(seq);
+}
+
+function rerenderBreakdown() {
+	if (!lastDeconstructSeq) return;
+	renderBreakdown(breakdownDiv, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, { reverseOrder: readLastFirst() });
 }
 
 async function runDeconstruct() {
@@ -130,6 +201,7 @@ async function runDeconstruct() {
 	breakdownDiv.innerHTML = "";
 	moveToBuilderBtn.hidden = true;
 	lastDeconstructIds = null;
+	lastDeconstructSeq = null;
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
@@ -139,7 +211,10 @@ async function runDeconstruct() {
 		}
 		const best = result.matches[0];
 		const built = buildWord(best.seq);
-		renderBreakdown(breakdownDiv, word, best.seq, built, glossSummaryItems);
+		lastDeconstructWord = word;
+		lastDeconstructSeq = best.seq;
+		lastDeconstructBuilt = built;
+		rerenderBreakdown();
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
 		moveToBuilderBtn.hidden = false;
 		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
@@ -154,7 +229,7 @@ function moveToBuilder() {
 	const ids = lastDeconstructIds;
 	setMode("build");
 	Blockly.svgResize(workspace);
-	renderChain(workspace, ids, presetsById);
+	renderChain(workspace, ids, presetsById, showIds());
 	workspace.scrollCenter(); // the toolbox otherwise covers a stack placed at the workspace's default (20, 20) origin
 	refreshBuild();
 }
@@ -181,7 +256,10 @@ function applyToolbox() {
 	const filtered = q
 		? presets.filter((p) => p.id.toLowerCase().includes(q) || (p.glossShort || p.gloss || "").toLowerCase().includes(q))
 		: presets;
-	workspace.updateToolbox(q ? buildToolbox(filtered) : fullToolbox);
+	// Rebuilt every time from scratch (no cached "full" toolbox), since
+	// showIds() can change independently of the filter and both need to be
+	// reflected together.
+	workspace.updateToolbox(buildToolbox(filtered, showIds()));
 	closeOpenFlyout();
 }
 
@@ -198,10 +276,11 @@ function setMode(next) {
 
 	if (next === "build") {
 		requestAnimationFrame(() => Blockly.svgResize(workspace));
-		setStatus("Drag a morpheme block in to begin.", "");
+		refreshBuild();
 	} else {
 		breakdownDiv.innerHTML = "";
 		moveToBuilderBtn.hidden = true;
+		updateReadingLine(null);
 		setStatus("Type a word and press Deconstruct.", "");
 	}
 }
@@ -209,16 +288,16 @@ function setMode(next) {
 async function main() {
 	blocklyThemes = buildBlocklyThemes();
 	initTheme();
+	initDisplayOptions();
 	setStatus("Loading morpheme catalog…", "");
 	const catalog = await loadCatalog();
 	presets = catalog.presets;
 	presetsById = new Map(presets.map((p) => [p.id, p]));
 
 	defineMorphemeBlocks();
-	fullToolbox = buildToolbox(presets);
 
 	workspace = Blockly.inject(blocklyDiv, {
-		toolbox: fullToolbox,
+		toolbox: buildToolbox(presets, showIds()),
 		theme: isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light,
 		trashcan: true,
 		zoom: { controls: true, wheel: true },

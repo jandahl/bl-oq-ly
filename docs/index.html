@@ -17,6 +17,10 @@
 			<button id="mode-build" role="tab" aria-selected="true" class="active">Build</button>
 			<button id="mode-deconstruct" role="tab" aria-selected="false">Deconstruct</button>
 		</div>
+		<div class="view-options">
+			<label><input type="checkbox" id="opt-reading-order" checked /> Read last morpheme first</label>
+			<label><input type="checkbox" id="opt-show-ids" /> Show morpheme ids</label>
+		</div>
 	</header>
 
 	<main>
@@ -40,6 +44,7 @@
 
 		<div id="blockly-div"></div>
 		<div id="breakdown" hidden></div>
+		<p id="reading-line" class="reading-line" hidden></p>
 
 		<section id="status" aria-live="polite">
 			<p id="status-line">Loading morpheme catalog…</p>

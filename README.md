@@ -64,6 +64,51 @@ active). An earlier version forced Blockly's toolbox text to a fixed dark
 colour via a blanket CSS override — readable, but meant Blockly's own chrome
 could never actually go dark; this replaces that hack with real theming.
 
+### Display options
+
+Two checkboxes under the mode toggle, both persisted:
+
+- **"Read last morpheme first"** (default on). A Kalaallisut word's
+  morphemes read stem-to-ending; a European reader's own translation runs
+  the other way (e.g. *dog-have-statement* → "he/she/it has a dog" reads
+  ending-to-stem). This reverses the *display* order — Deconstruct's rows,
+  and a reading-order line under Build's status box (e.g. `statement —
+  he/she/it · to have a dog · dog`) — but deliberately **not** the physical
+  Blockly block stack in Build mode itself, which always stays stem-first.
+  Flipping the actual stack would conflict with two things that must stay
+  stem-first: `buildWord()`'s own required sequence order, and the
+  one-directional connection constraints below (a stem has no
+  `previousConnection`, a word-final ending has no `nextConnection` — those
+  only make sense read in one consistent direction). If a literally reversed
+  block stack turns out to matter more than this tradeoff, that's a further
+  redesign, not a toggle.
+- **"Show morpheme ids"** (default off). Hides grammarian's internal ids
+  (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) from block labels, showing just the
+  gloss (toggle on to see the id again — useful for cross-referencing
+  against grammarian's own data). Toggling relabels every block already on
+  the canvas (`blocks.js`'s `relabelBlocks()`), not just future ones.
+
+Deconstruct also separates a mood-marking morpheme's own grammatical
+category (`moodLabel` — "statement", "question", ...) from its gloss text
+into a small tag (`+voq` → *(statement)* `he/she/it`) instead of folding it
+into the gloss string with the same em-dash join every other row uses,
+which read as one more piece of translation rather than a distinct kind of
+information.
+
+### Directional connections
+
+A stem's block has no `previousConnection` at all (nothing can ever precede
+it — it's always leftmost), and a word-final morpheme (an ordinary
+inflectional ending or plain enclitic — not a `derivational_enclitic`, which
+grammarian's own schema documents as not sealing the word) has no
+`nextConnection` (nothing can follow it). Blockly's drag-snap machinery
+simply never offers those connection points, so that whole class of illegal
+stack is unattachable in the UI, not just rejected after the fact by
+`buildWord()`. This only encodes the two structural cases that are always
+true regardless of which specific morpheme is involved — it does not attempt
+to re-encode morphotactics.js's full join-legality rules (a real engine
+concern that belongs in oq) as Blockly connection checks.
+
 ## Data sources
 
 - **Engine**: [`jandahl/oq`](https://github.com/jandahl/oq)'s experimental
