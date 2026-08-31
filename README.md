@@ -44,8 +44,10 @@ One page, two modes:
   `gloss` is the whole sentence, not just its own piece. An earlier version
   of this repo only ever read each item's own `shortGloss` for its row and
   never surfaced this — a bug in how this repo used the API, not a gap in
-  oq's public surface (`breakdown.js`'s `composedTranslation()`). A **"Move
-  to Word Builder"** button (shown once a breakdown renders) switches to
+  oq's public surface (`gloss.js`'s `composedTranslation()`, shared with
+  Build's own reading line below — an identical bug existed there too until
+  it was pointed out). A **"Move to Word Builder"** button (shown once a
+  breakdown renders) switches to
   Build mode and recreates the verified chain as a live, editable block
   stack (`blocks.js`'s `renderChain()`) so the learner can keep
   experimenting from a known-good starting point instead of rebuilding it
@@ -78,18 +80,20 @@ could never actually go dark; this replaces that hack with real theming.
 
 Two checkboxes under the mode toggle, both persisted:
 
-- **"Read last morpheme first"** (default on). A Kalaallisut word's
-  morphemes read stem-to-ending; a European reader's own translation runs
-  the other way (e.g. *dog-have-statement* → "he/she/it has a dog" reads
-  ending-to-stem). This reverses the *display* order — Deconstruct's rows,
-  and a reading-order line under Build's status box (e.g. `statement —
-  he/she/it · to have a dog · dog`) — but deliberately **not** the physical
-  Blockly block stack in Build mode itself, which always stays stem-first.
-  Flipping the actual stack would conflict with two things that must stay
-  stem-first: `buildWord()`'s own required sequence order, and the
-  one-directional connection constraints below (a stem has no
-  `previousConnection`, a word-final ending has no `nextConnection` — those
-  only make sense read in one consistent direction).
+- **"Read last morpheme first"** (default on). Reverses Deconstruct's
+  per-morpheme rows so a European reader's own translation direction reads
+  top-to-bottom (e.g. a word literally ordered dog-have-statement lists
+  `statement — he/she/it`, then `to have a`, then `dog`). It does **not**
+  affect the composed, full-sentence translation line (Deconstruct's own
+  and Build's `#reading-line`, both via `gloss.js`'s `composedTranslation()`
+  — see below) — a single sentence isn't a reversible list — and
+  deliberately **not** the physical Blockly block stack in Build mode
+  itself, which always stays stem-first. Flipping the actual stack would
+  conflict with two things that must stay stem-first: `buildWord()`'s own
+  required sequence order, and the one-directional connection constraints
+  below (a stem has no `previousConnection`, a word-final ending has no
+  `nextConnection` — those only make sense read in one consistent
+  direction).
   **Owner decision**: a fully reversible block stack (build in either
   direction, not just read either direction) is real, tracked future work,
   explicitly deferred rather than dropped — not a toggle to add casually on

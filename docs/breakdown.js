@@ -7,38 +7,7 @@
 // Blockly's overhead, and a flex-wrapping row list is far more usable on a
 // small screen than a read-only block stack would be.
 
-/**
- * A mood-marking morpheme's own gloss/shortGloss bakes its moodLabel
- * ("statement", "question", ...) into the string itself — real information
- * (this morpheme marks the indicative/declarative mood), just formatted
- * identically to everything else, which read as one more undifferentiated
- * translation fragment rather than a distinct grammatical category
- * (bl-oq-ly#12). Split it back out. `gloss` uses "label: rest" (the raw
- * scholarly template's own separator); `shortGloss` uses "label — rest".
- */
-function splitMoodLabel(text, moodLabel) {
-	if (!moodLabel) return { moodLabel: null, rest: text };
-	for (const sep of [": ", " — "]) {
-		if (text.startsWith(moodLabel + sep)) return { moodLabel, rest: text.slice(moodLabel.length + sep.length) };
-	}
-	return { moodLabel: null, rest: text };
-}
-
-/**
- * The composed, full-sentence translation oq's own Deconstruct shows (e.g.
- * "qimmeqarpunga" -> "I have a dog") isn't a separate function — it's
- * already sitting in the LAST morpheme's own `gloss` field: glossSummaryItems
- * threads each stem/affix's contribution through fillStemSlot's "___"
- * substitution (stemIn/stemOut), so the final item's `gloss` is the whole
- * sentence, not just its own piece. Missing this was this repo's own bug,
- * not a gap in oq's public API.
- */
-function composedTranslation(items) {
-	const last = items[items.length - 1];
-	if (!last) return "";
-	const { rest } = splitMoodLabel(last.gloss || last.shortGloss || "", last.moodLabel);
-	return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : "";
-}
+import { splitMoodLabel, composedTranslation } from "./gloss.js";
 
 /**
  * @param {HTMLElement} container

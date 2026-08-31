@@ -3,6 +3,7 @@ import { loadCatalog } from "./catalog.js";
 import { defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks } from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
+import { composedTranslation } from "./gloss.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
@@ -57,31 +58,33 @@ function initDisplayOptions() {
 	});
 	readingOrderCheckbox.addEventListener("change", () => {
 		localStorage.setItem(READING_ORDER_KEY, String(readingOrderCheckbox.checked));
-		refreshBuild();
+		// Only Deconstruct's per-morpheme rows are reversible -- Build's
+		// reading line is a composed sentence, unaffected (see gloss.js).
 		if (lastDeconstructIds) rerenderBreakdown();
 	});
 }
 
 /**
- * Physically flipping the Blockly block stack to visually read
- * ending-first would conflict with two things that must stay stem-first:
+ * Shows the same composed, full-sentence translation Deconstruct does (e.g.
+ * "qimmeqarpunga" -> "I have a dog"), not a " · "-joined list of each
+ * morpheme's own fragment -- an earlier version of this line did the latter
+ * and never picked up the composedTranslation() fix once that shipped for
+ * Deconstruct, the same bug in a second place. A single composed sentence
+ * isn't a reversible list, so the European-reading-order toggle
+ * (bl-oq-ly#11) doesn't apply here -- see gloss.js's own comment. It's kept
+ * as a distinct display element from Build's status line for a different
+ * reason: physically flipping the Blockly block stack to visually read
+ * ending-first would conflict with two things that must stay stem-first --
  * buildWord()'s own required sequence order, and the one-directional
- * connection constraints in blocks.js (a stem has no previousConnection,
- * a word-final ending has no nextConnection) that make an illegal stack
- * physically un-attachable. So "read last morpheme first" only reverses
- * *display* -- Deconstruct's row order, and this separate reading-order
- * line under Build's status box -- never the block stack's own construction
- * order or direction.
+ * connection constraints in blocks.js -- so this exists to give a
+ * European-friendly translation without touching the block stack itself.
  */
 function updateReadingLine(seq) {
 	if (!seq) {
 		readingLine.hidden = true;
 		return;
 	}
-	let items = glossSummaryItems(seq).filter((item) => item.marker !== "Ø");
-	if (readLastFirst()) items = items.slice().reverse();
-	const phrase = items.map((item) => item.shortGloss || item.gloss || item.meaning || "?").join(" · ");
-	readingLine.textContent = phrase;
+	readingLine.textContent = composedTranslation(glossSummaryItems(seq));
 	readingLine.hidden = false;
 }
 
