@@ -33,13 +33,23 @@ One page, two modes:
 - **Deconstruct**: type an attested Kalaallisut word; oq's `analyzeWord()`
   searches for morpheme sequences that verifiably rebuild it (each candidate
   is checked by actually running it back through `buildWord()`), and the
-  best match renders as a per-morpheme gloss breakdown (declared spelling +
-  short, blank-filled gloss per row, e.g. `-qaq — to have a dog`), not a raw
-  list of morpheme ids. A **"Move to Word Builder"** button (shown once a
-  breakdown renders) switches to Build mode and recreates the verified chain
-  as a live, editable block stack (`blocks.js`'s `renderChain()`) so the
-  learner can keep experimenting from a known-good starting point instead of
-  rebuilding it by hand.
+  best match renders as oq's own Deconstruct does: a composed, full-sentence
+  translation first (e.g. `qimmeqarpunga` → "I have a dog"), then a
+  per-morpheme breakdown below it (declared spelling + short, blank-filled
+  gloss per row, e.g. `-qaq — to have a dog`) — not a raw list of morpheme
+  ids. The composed translation isn't a separate function call: it's
+  already sitting in the *last* morpheme's own `gloss` field —
+  `glossSummaryItems` threads each stem/affix's contribution through a
+  `"___"`-slot substitution as it walks the sequence, so the final item's
+  `gloss` is the whole sentence, not just its own piece. An earlier version
+  of this repo only ever read each item's own `shortGloss` for its row and
+  never surfaced this — a bug in how this repo used the API, not a gap in
+  oq's public surface (`breakdown.js`'s `composedTranslation()`). A **"Move
+  to Word Builder"** button (shown once a breakdown renders) switches to
+  Build mode and recreates the verified chain as a live, editable block
+  stack (`blocks.js`'s `renderChain()`) so the learner can keep
+  experimenting from a known-good starting point instead of rebuilding it
+  by hand.
 
 Blockly's previous/next statement connections do the stack-shape enforcement
 for free — a morpheme chain is linear and order-strict (stem first, a

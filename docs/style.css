@@ -191,8 +191,14 @@ main {
 .breakdown-word {
 	font-size: 1.6rem;
 	font-weight: 700;
-	margin-bottom: 0.75rem;
+	margin-bottom: 0.25rem;
 	word-break: break-word;
+}
+
+.breakdown-translation {
+	margin: 0 0 1rem;
+	font-size: 1.1rem;
+	color: var(--accent);
 }
 
 .breakdown-rows {
