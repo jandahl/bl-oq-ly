@@ -164,36 +164,54 @@ no reason connected to the content being shared. They stay in
 "Inflectional endings" replaces ~278 individual verb-mood ending entries
 (one per real mood × transitivity × subject × object combination — a flat
 scroll no learner should have to search) with a single conjugation-style
-picker block at the top of the category (bl-oq-ly#18). Four plain Blockly
-`FieldDropdown`s — mood, transitivity, subject, object (object hidden for
-an intransitive mood) — resolve live to a real morpheme id, shown on the
-block itself (`buildWord`'s own spelling + gloss); a fifth "variant"
+picker block at the top of the category (bl-oq-ly#18). Two plain Blockly
+`FieldDropdown`s — mood, subject — resolve live to a real morpheme id,
+shown on the block itself (`buildWord`'s own spelling + gloss); a "variant"
 dropdown appears only for the ~23 real endings that share identical
 paradigm coordinates (e.g. plain vs. negative contemporative), letting the
 learner choose between them. `docs/verb-endings.js` builds the paradigm
 index from grammarian's own catalog and looks up candidates by coordinate;
 `docs/blocks.js` owns the block/field wiring.
 
-Subject and object are each a single combined "I"/"you"/"he, she, it"/...
-choice (not separate person and number dropdowns) — the same pairing oq's
-own "conjugate to..." modal uses. Label text throughout (mood names,
-person/number wording) comes from oq's public API (`resolveMoodLabel`/
-`resolvePersonLabel`, oq#881) — the exact plain-language wording oq's own
-conjugation modal shows by default ("statement", not "indicative"), honoring
-the visitor's stored pronoun preference for the two gendered combinations
-(3sg/4sg) — rather than this repo maintaining an independent rendering of
-the same categories. Both functions are threaded in as parameters from
-`app.js` (which is the only module that imports `oq-api.js`'s live,
-network-backed re-export of oq's public API) rather than imported directly
-by `verb-endings.js`/`blocks.js`, so those two stay plain, dependency-free
-and unit-testable under Node.
+The object isn't a third dropdown: it's a real, sideways puzzle-piece value
+socket (`OBJECT_SLOT`), dangling and optional the same way a math block's
+own operand socket can sit empty (bl-oq-ly#20 follow-up). Plugging a small
+object-selector block (its own "I"/"you"/"he, she, it"/... dropdown,
+`morpheme_block__verb_object`) into it makes the ending transitive and
+supplies the object's person/number; leaving it unplugged is intransitive.
+This is the idiomatic Blockly mechanism for "an optional choice that also
+carries its own value" — a learner physically connecting or disconnecting
+the object block IS the with/without-an-object choice, not a yes/no
+dropdown plus a second, conditionally-visible one. Since a field validator
+can only observe changes to a block's OWN fields, reacting to a plug/unplug
+(or to the connected object block's own dropdown changing) needs a
+different hook: `registerVerbPickerReactivity()` installs one
+workspace-level change listener (wired up once, right after
+`Blockly.inject()`) that re-resolves every picker block on the workspace
+whenever a relevant Blockly event fires, however the event happens — real
+drag, or programmatic `.connect()`/`.setFieldValue()` alike.
+
+Subject (and the object block's own combo) is a single combined
+"I"/"you"/"he, she, it"/... choice (not separate person and number
+dropdowns) — the same pairing oq's own "conjugate to..." modal uses. Label
+text throughout (mood names, person/number wording) comes from oq's public
+API (`resolveMoodLabel`/`resolvePersonLabel`, oq#881) — the exact
+plain-language wording oq's own conjugation modal shows by default
+("statement", not "indicative"), honoring the visitor's stored pronoun
+preference for the two gendered combinations (3sg/4sg) — rather than this
+repo maintaining an independent rendering of the same categories. Both
+functions are threaded in as parameters from `app.js` (which is the only
+module that imports `oq-api.js`'s live, network-backed re-export of oq's
+public API) rather than imported directly by `verb-endings.js`/`blocks.js`,
+so those two stay plain, dependency-free and unit-testable under Node.
 
 A verb ending block placed on the canvas any other way -- Deconstruct's
 "Move to Word Builder," or restoring a shared `?chain=...` link -- is a real
-picker instance too, its fields set to match that exact id (including the
-variant dropdown, for one of the ~23 duplicate-coordinate ids), not a
-frozen label with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s
-`renderChain()` builds these via `restoreVerbPickerFields()`.
+picker instance too, its fields set to match that exact id, a real object
+block plugged in and connected for a transitive ending, and the variant
+dropdown set for one of the ~23 duplicate-coordinate ids -- not a frozen
+label with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s `renderChain()`
+builds these via `restoreVerbPickerFields()`.
 
 ### Mobile
 
