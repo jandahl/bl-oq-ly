@@ -15,11 +15,13 @@ import { splitMoodLabel, composedTranslation } from "./gloss.js";
  * @param {any[]} seq - the winning candidate's seq[] (buildWord-shaped items)
  * @param {{ word: string, approximate: boolean, closed: boolean }} buildResult
  * @param {(seq: any[], opts?: any) => any[]} glossSummaryItems
- * @param {{ reverseOrder?: boolean }} [opts] - bl-oq-ly#11: read last-morpheme-first
- *   in the per-morpheme ROW list below the translation (e.g. "statement —
- *   I" / "to have a" / "dog" for a word literally ordered dog-have-statement).
- *   Never affects the composed translation line itself, which is a single
- *   sentence, not a reversible list.
+ * @param {{ reverseOrder?: boolean, lang?: "en"|"da" }} [opts] - bl-oq-ly#11:
+ *   `reverseOrder` reads last-morpheme-first in the per-morpheme ROW list
+ *   below the translation (e.g. "statement — I" / "to have a" / "dog" for a
+ *   word literally ordered dog-have-statement). Never affects the composed
+ *   translation line itself, which is a single sentence, not a reversible
+ *   list. `lang` (bl-oq-ly#17) selects which of grammarian's published
+ *   languages glossSummaryItems resolves each gloss in.
  */
 export function renderBreakdown(container, word, seq, buildResult, glossSummaryItems, opts = {}) {
 	container.innerHTML = "";
@@ -29,7 +31,7 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 	heading.textContent = (buildResult.approximate ? "≈ " : "") + buildResult.word;
 	container.appendChild(heading);
 
-	const allItems = glossSummaryItems(seq);
+	const allItems = glossSummaryItems(seq, { lang: opts.lang });
 	const translation = composedTranslation(allItems);
 	if (translation) {
 		const translationEl = document.createElement("p");

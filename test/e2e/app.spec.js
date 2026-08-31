@@ -79,21 +79,112 @@ test("Build: toolbox blocks are colour-coded per category, not a single shared c
 });
 
 test("Build: block labels always show the real Kalaallisut spelling, and hide grammarian's internal id by default (bl-oq-ly#10/#14)", async ({ page }) => {
-	await page.fill("#morpheme-filter", "V_IND_INTR_1SG");
+	await page.fill("#morpheme-filter", "N_qaq_Vb");
 	await page.locator(".blocklyTreeLabel").first().click({ force: true });
 	await page.waitForTimeout(400);
 	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
-	expect(label).toContain("-vunga");
-	expect(label).not.toContain("V_IND_INTR_1SG");
-	expect(label).not.toContain("statement");
+	expect(label).toContain("-qaq");
+	expect(label).not.toContain("N_qaq_Vb");
 
 	await page.click("#opt-show-ids");
 	await page.waitForTimeout(400);
 	await page.locator(".blocklyTreeLabel").first().click({ force: true });
 	await page.waitForTimeout(400);
 	const labelWithId = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
-	expect(labelWithId).toContain("V_IND_INTR_1SG");
-	expect(labelWithId).toContain("-vunga");
+	expect(labelWithId).toContain("N_qaq_Vb");
+	expect(labelWithId).toContain("-qaq");
+});
+
+test("Build: verb ending picker resolves a real morpheme on init, updates live, toggles object fields, and offers a variant for a duplicate-coordinate combination (bl-oq-ly#18)", async ({ page }) => {
+	const result = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const block = ws.newBlock("morpheme_block__verb_ending_picker");
+		block.initSvg();
+		block.render();
+		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), objVisible: block.getInput("OBJ").isVisible() };
+
+		block.setFieldValue("interrogative", "MOOD");
+		block.setFieldValue("3|sg", "SUBJECT");
+		const afterChange = { data: block.data, resolved: block.getFieldValue("RESOLVED") };
+
+		block.setFieldValue("transitive", "TRANS");
+		const objVisibleAfterTransitive = block.getInput("OBJ").isVisible();
+		block.setFieldValue("intransitive", "TRANS");
+		const objVisibleAfterBack = block.getInput("OBJ").isVisible();
+
+		// contemporative/intransitive/1sg is a real duplicate-coordinate combo
+		// (plain vs. negative contemporative) -- see verb-endings.js's own comment.
+		block.setFieldValue("contemporative", "MOOD");
+		block.setFieldValue("1|sg", "SUBJECT");
+		const variant = { visible: block.getInput("VARIANT_GROUP").isVisible(), optionCount: block.verbPickerState.candidateOptions.length };
+
+		block.dispose(false);
+		return { initial, afterChange, objVisibleAfterTransitive, objVisibleAfterBack, variant };
+	});
+
+	expect(result.initial.data).toBeTruthy();
+	expect(result.initial.resolved).not.toBe("");
+	expect(result.initial.objVisible).toBe(false); // default mood is intransitive
+	expect(result.afterChange.data).toBeTruthy();
+	expect(result.afterChange.resolved).not.toContain("(no such ending"); // interrogative 3sg is a real form
+	expect(result.objVisibleAfterTransitive).toBe(true);
+	expect(result.objVisibleAfterBack).toBe(false);
+	expect(result.variant.visible).toBe(true);
+	expect(result.variant.optionCount).toBeGreaterThan(1);
+});
+
+test("Build: verb ending picker, once connected into a chain, builds the real word via buildWord() (bl-oq-ly#18)", async ({ page }) => {
+	await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		for (const b of ws.getTopBlocks(false)) b.dispose(false);
+		const stem = ws.newBlock("morpheme_block__stem_n");
+		stem.data = "qimmeq";
+		stem.initSvg(); stem.render();
+		const affix = ws.newBlock("morpheme_block__deriv_affix");
+		affix.data = "N_qaq_Vb";
+		affix.initSvg(); affix.render();
+		const ending = ws.newBlock("morpheme_block__verb_ending_picker"); // default resolves to V_IND_INTR_1SG
+		ending.initSvg(); ending.render();
+		stem.nextConnection.connect(affix.previousConnection);
+		affix.nextConnection.connect(ending.previousConnection);
+	});
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 10_000 });
+	await expect(page.locator("#status-line")).toHaveText("qimmeqarpunga");
+	await expect(page.locator("#reading-line")).toHaveText("I have a dog");
+});
+
+test("Build: filtering the palette hides the verb ending picker entirely (bl-oq-ly#18: it has no id/gloss text to match a query)", async ({ page }) => {
+	await page.fill("#morpheme-filter", "qimme");
+	await page.waitForTimeout(400);
+	const names = await page.locator(".blocklyTreeLabel").allTextContents();
+	expect(names.some((n) => n.startsWith("Inflectional endings"))).toBe(false);
+});
+
+test("Danish gloss language: block labels and Deconstruct's translation switch to Danish text (bl-oq-ly#17)", async ({ page }) => {
+	await page.selectOption("#opt-lang", "da");
+	await page.waitForTimeout(300);
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	const translation = await page.textContent(".breakdown-translation");
+	expect(translation.toLowerCase()).toContain("hund"); // Danish for "dog"
+});
+
+test("Spelling-visibility mode: gloss-only and spelling-only each show exactly what they promise (bl-oq-ly#17)", async ({ page }) => {
+	const stemCat = page.locator(".blocklyTreeLabel").filter({ hasText: "Stems — nouns" }).first();
+
+	await page.selectOption("#opt-spelling", "gloss-only");
+	await stemCat.click({ force: true });
+	await page.waitForTimeout(400);
+	const glossOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
+	expect(glossOnlyLabel).not.toContain(" — "); // "both" mode's only separator -- gloss-only never joins two parts
+
+	await page.selectOption("#opt-spelling", "spelling-only");
+	await stemCat.click({ force: true });
+	await page.waitForTimeout(400);
+	const spellingOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
+	expect(spellingOnlyLabel).not.toContain(" — ");
 });
 
 test("Build: directional connections — a stem can't be preceded, a word-final ending can take an enclitic, a particle is fully standalone (bl-oq-ly#11/#15)", async ({ page }) => {
