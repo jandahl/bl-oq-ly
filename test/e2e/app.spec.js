@@ -95,22 +95,17 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 	expect(labelWithId).toContain("-qaq");
 });
 
-test("Build: verb ending picker resolves a real morpheme on init, updates live, toggles object fields, and offers a variant for a duplicate-coordinate combination (bl-oq-ly#18)", async ({ page }) => {
+test("Build: verb ending picker resolves a real morpheme on init, updates live, and offers a variant for a duplicate-coordinate combination (bl-oq-ly#18)", async ({ page }) => {
 	const result = await page.evaluate(() => {
 		const ws = Blockly.getMainWorkspace();
 		const block = ws.newBlock("morpheme_block__verb_ending_picker");
 		block.initSvg();
 		block.render();
-		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), objVisible: block.getInput("OBJ").isVisible() };
+		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), hasObject: block.getInputTargetBlock("OBJECT_SLOT") !== null };
 
 		block.setFieldValue("interrogative", "MOOD");
 		block.setFieldValue("3|sg", "SUBJECT");
 		const afterChange = { data: block.data, resolved: block.getFieldValue("RESOLVED") };
-
-		block.setFieldValue("transitive", "TRANS");
-		const objVisibleAfterTransitive = block.getInput("OBJ").isVisible();
-		block.setFieldValue("intransitive", "TRANS");
-		const objVisibleAfterBack = block.getInput("OBJ").isVisible();
 
 		// contemporative/intransitive/1sg is a real duplicate-coordinate combo
 		// (plain vs. negative contemporative) -- see verb-endings.js's own comment.
@@ -119,18 +114,62 @@ test("Build: verb ending picker resolves a real morpheme on init, updates live, 
 		const variant = { visible: block.getInput("VARIANT_GROUP").isVisible(), optionCount: block.verbPickerState.candidateOptions.length };
 
 		block.dispose(false);
-		return { initial, afterChange, objVisibleAfterTransitive, objVisibleAfterBack, variant };
+		return { initial, afterChange, variant };
 	});
 
 	expect(result.initial.data).toBeTruthy();
 	expect(result.initial.resolved).not.toBe("");
-	expect(result.initial.objVisible).toBe(false); // default mood is intransitive
+	expect(result.initial.hasObject).toBe(false); // nothing plugged into OBJECT_SLOT yet -- intransitive
 	expect(result.afterChange.data).toBeTruthy();
 	expect(result.afterChange.resolved).not.toContain("(no such ending"); // interrogative 3sg is a real form
-	expect(result.objVisibleAfterTransitive).toBe(true);
-	expect(result.objVisibleAfterBack).toBe(false);
 	expect(result.variant.visible).toBe(true);
 	expect(result.variant.optionCount).toBeGreaterThan(1);
+});
+
+test("Build: plugging a verb-object block into the picker's OBJECT_SLOT makes it transitive and drives the conjugation; unplugging reverts to intransitive (bl-oq-ly#20 follow-up)", async ({ page }) => {
+	// registerVerbPickerReactivity() reacts to real Blockly workspace events,
+	// which (unlike a field validator's own synchronous call) fire on a
+	// later tick, not inside the same page.evaluate() call that triggers
+	// them -- confirmed empirically (a same-call read raced the event and
+	// always saw the stale value). Each step below is its own evaluate()
+	// call with an expect.poll() in between, giving the event loop a turn.
+	const beforePlug = await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		for (const b of ws.getTopBlocks(false)) b.dispose(false);
+		const picker = ws.newBlock("morpheme_block__verb_ending_picker");
+		picker.initSvg();
+		picker.render();
+		window.__picker = picker;
+		return { data: picker.data, resolved: picker.getFieldValue("RESOLVED") };
+	});
+	expect(beforePlug.data).toBe("V_IND_INTR_1SG"); // default mood/subject, no object -> intransitive
+
+	await page.evaluate(() => {
+		const ws = Blockly.getMainWorkspace();
+		const obj = ws.newBlock("morpheme_block__verb_object");
+		obj.initSvg();
+		obj.render();
+		obj.setFieldValue("3|sg", "COMBO");
+		window.__obj = obj;
+		window.__picker.getInput("OBJECT_SLOT").connection.connect(obj.outputConnection);
+	});
+	await expect.poll(() => page.evaluate(() => window.__picker.data)).toBe("V_IND_TR_1SG_3SG"); // same mood/subject, now transitive with a 3sg object
+	const afterPlug = await page.evaluate(() => window.__picker.getInputTargetBlock("OBJECT_SLOT") !== null);
+	expect(afterPlug).toBe(true);
+
+	// Editing the plugged-in object's own dropdown must re-resolve the
+	// OWNING picker too -- a field validator on the picker itself can't
+	// observe a change on a different (connected) block, which is exactly
+	// what registerVerbPickerReactivity() exists for.
+	await page.evaluate(() => window.__obj.setFieldValue("2|sg", "COMBO"));
+	await expect.poll(() => page.evaluate(() => window.__picker.data)).toBe("V_IND_TR_1SG_2SG");
+
+	await page.evaluate(() => { window.__obj.unplug(true); window.__obj.dispose(false); });
+	await expect.poll(() => page.evaluate(() => window.__picker.data)).toBe("V_IND_INTR_1SG"); // back to intransitive
+	const hasObjectAfterUnplug = await page.evaluate(() => window.__picker.getInputTargetBlock("OBJECT_SLOT") !== null);
+	expect(hasObjectAfterUnplug).toBe(false);
+
+	await page.evaluate(() => { window.__picker.dispose(false); delete window.__picker; delete window.__obj; });
 });
 
 test("Build: verb ending picker, once connected into a chain, builds the real word via buildWord() (bl-oq-ly#18)", async ({ page }) => {
@@ -363,6 +402,20 @@ test("Shareable links: a chain link naming one of the duplicate-coordinate varia
 		return b && { data: b.data, variant: b.getFieldValue("VARIANT") };
 	});
 	expect(block).toEqual({ data: "V_CONTNEG_1SG", variant: "V_CONTNEG_1SG" });
+	await page2.close();
+});
+
+test("Shareable links: a chain link naming a transitive ending restores it with a real object block plugged into OBJECT_SLOT, not just the subject (bl-oq-ly#20 follow-up)", async ({ page }) => {
+	const page2 = await page.context().newPage();
+	page2.on("pageerror", (err) => { throw new Error(`Unexpected uncaught page error: ${err.message}`); });
+	await page2.goto("/?chain=taku,V_IND_TR_1SG_3SG");
+	await expect(page2.locator("#status")).toHaveClass(/ok/, { timeout: 20_000 });
+	const picker = await page2.evaluate(() => {
+		const b = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
+		const obj = b?.getInputTargetBlock("OBJECT_SLOT");
+		return b && { data: b.data, objectType: obj?.type, objectCombo: obj?.getFieldValue("COMBO") };
+	});
+	expect(picker).toEqual({ data: "V_IND_TR_1SG_3SG", objectType: "morpheme_block__verb_object", objectCombo: "3|sg" });
 	await page2.close();
 });
 

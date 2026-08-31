@@ -2,7 +2,7 @@ import { buildWord, analyzeWordAsync, glossSummaryItems, resolveMoodLabel, resol
 import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks,
-	buildVerbEndingIndex, defineVerbEndingPickerBlock,
+	buildVerbEndingIndex, defineVerbEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 } from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
@@ -390,6 +390,7 @@ async function main() {
 	defineMorphemeBlocks();
 	const verbEndingIndex = buildVerbEndingIndex(presets);
 	defineVerbEndingPickerBlock(verbEndingIndex, presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
+	defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel);
 
 	workspace = Blockly.inject(blocklyDiv, {
 		toolbox: buildToolbox(presets, displayOptions()),
@@ -407,6 +408,7 @@ async function main() {
 		move: { scrollbars: true, drag: true, wheel: true },
 	});
 	workspace.addChangeListener(() => refreshBuild());
+	registerVerbPickerReactivity(workspace);
 	window.addEventListener("resize", () => Blockly.svgResize(workspace));
 	window.addEventListener("orientationchange", () => Blockly.svgResize(workspace));
 
