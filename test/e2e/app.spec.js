@@ -346,13 +346,24 @@ test("Build: a restored verb ending block (Move to Word Builder) stays live -- c
 });
 
 test("Shareable links: a chain link naming one of the duplicate-coordinate variants (V_CONTNEG_1SG) restores that exact variant, not just the first candidate", async ({ page }) => {
-	await page.goto("/?chain=neri,V_CONTNEG_1SG");
-	await expect(page.locator("#status-line")).toHaveText("nerinanga", { timeout: 20_000 });
-	const block = await page.evaluate(() => {
+	// A fresh page/context for this navigation, not a second goto() on the
+	// beforeEach's own `page` -- a repeat same-origin fetch of oq's
+	// public-api.js can legitimately come back 304 (cache revalidation) on
+	// CI's real network, which beforeEach's response.ok() check (correctly)
+	// treats as worth investigating for every OTHER resource, but not this
+	// one: 304 is not a failure here, just a second load in one browser
+	// session. Matches the pattern the other Shareable-links tests already
+	// use for exactly this reason.
+	const page2 = await page.context().newPage();
+	page2.on("pageerror", (err) => { throw new Error(`Unexpected uncaught page error: ${err.message}`); });
+	await page2.goto("/?chain=neri,V_CONTNEG_1SG");
+	await expect(page2.locator("#status-line")).toHaveText("nerinanga", { timeout: 20_000 });
+	const block = await page2.evaluate(() => {
 		const b = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
 		return b && { data: b.data, variant: b.getFieldValue("VARIANT") };
 	});
 	expect(block).toEqual({ data: "V_CONTNEG_1SG", variant: "V_CONTNEG_1SG" });
+	await page2.close();
 });
 
 test("Shareable links: building a chain live-updates the URL, and reloading a chain link restores the same word (router.js)", async ({ page }) => {
