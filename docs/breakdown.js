@@ -1,25 +1,27 @@
 // Renders a Deconstruct result as a per-morpheme gloss breakdown, the same
 // kind of view oq's own Deconstruct gives — a row per morpheme with its
-// declared/citation spelling and a gloss — rather than raw morpheme ids in
-// a block stack (bl-oq-ly#4: ids like "N_qaq_Vb" mean nothing to a learner).
-// Deliberately plain HTML, not Blockly: the read-only case has no drag/snap
-// interaction to justify Blockly's overhead, and a flex-wrapping row list is
-// far more usable on a small screen than a read-only block stack.
+// declared/citation spelling and a short, blank-filled gloss — rather than
+// raw morpheme ids in a block stack (bl-oq-ly#4: ids like "N_qaq_Vb" mean
+// nothing to a learner). Deliberately plain HTML, not Blockly: the read-only
+// case has no drag/snap interaction to justify Blockly's overhead, and a
+// flex-wrapping row list is far more usable on a small screen than a
+// read-only block stack would be.
 //
-// Uses glossSummary() (the only gloss-joining function on the exported
-// public-api.js surface right now — see oq-api.js's comment) rather than the
-// shorter, blank-filled shortGloss a newer unreleased oq build carries: each
-// string is "marker+text — gloss", parsed back into two columns here. A
-// zero/null ending's own marker is the literal string "Ø" with empty text.
+// Uses glossSummaryItems() for its short, blank-filled `shortGloss` per
+// morpheme (e.g. "to have a(n) ___") — the same kind of phrasing oq's own
+// Deconstruct pills show — rather than the plainer, string-joining
+// glossSummary(). Only available now that oq-api.js points at a deployment
+// where glossSummaryItems is on the exported public-api.js surface; see
+// oq-api.js's own comment.
 
 /**
  * @param {HTMLElement} container
  * @param {string} word - the surface form that was analyzed
  * @param {any[]} seq - the winning candidate's seq[] (buildWord-shaped items)
  * @param {{ word: string, approximate: boolean, closed: boolean }} buildResult
- * @param {(seq: any[], opts?: any) => string[]} glossSummary
+ * @param {(seq: any[], opts?: any) => any[]} glossSummaryItems
  */
-export function renderBreakdown(container, word, seq, buildResult, glossSummary) {
+export function renderBreakdown(container, word, seq, buildResult, glossSummaryItems) {
 	container.innerHTML = "";
 
 	const heading = document.createElement("div");
@@ -27,25 +29,21 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummary)
 	heading.textContent = (buildResult.approximate ? "≈ " : "") + buildResult.word;
 	container.appendChild(heading);
 
-	const lines = glossSummary(seq).filter((line) => !line.startsWith("Ø —"));
+	const items = glossSummaryItems(seq).filter((item) => item.marker !== "Ø");
 
 	const rows = document.createElement("div");
 	rows.className = "breakdown-rows";
-	for (const line of lines) {
-		const sepIndex = line.indexOf(" — ");
-		const spellingText = sepIndex === -1 ? line : line.slice(0, sepIndex);
-		const glossText = sepIndex === -1 ? "" : line.slice(sepIndex + 3);
-
+	for (const item of items) {
 		const row = document.createElement("div");
 		row.className = "breakdown-row";
 
 		const spelling = document.createElement("span");
 		spelling.className = "breakdown-spelling";
-		spelling.textContent = spellingText;
+		spelling.textContent = `${item.marker}${item.text}`;
 
 		const gloss = document.createElement("span");
 		gloss.className = "breakdown-gloss";
-		gloss.textContent = glossText;
+		gloss.textContent = item.shortGloss || item.gloss || item.meaning || "(no gloss)";
 
 		row.append(spelling, gloss);
 		rows.appendChild(row);

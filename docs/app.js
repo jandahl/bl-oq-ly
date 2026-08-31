@@ -1,4 +1,4 @@
-import { buildWord, analyzeWordAsync, glossSummary } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, glossSummaryItems } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
 import { defineMorphemeBlock, buildToolbox, topLevelChains } from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
@@ -86,7 +86,7 @@ async function runDeconstruct() {
 		}
 		const best = result.matches[0];
 		const built = buildWord(best.seq);
-		renderBreakdown(breakdownDiv, word, best.seq, built, glossSummary);
+		renderBreakdown(breakdownDiv, word, best.seq, built, glossSummaryItems);
 		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
 	} catch (err) {
 		if (err?.name === "AbortError") return;

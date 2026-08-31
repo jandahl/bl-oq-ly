@@ -26,7 +26,8 @@ One page, two modes:
   searches for morpheme sequences that verifiably rebuild it (each candidate
   is checked by actually running it back through `buildWord()`), and the
   best match renders as a per-morpheme gloss breakdown (declared spelling +
-  gloss per row), not a raw list of morpheme ids.
+  short, blank-filled gloss per row, e.g. `-qaq — to have a dog`), not a raw
+  list of morpheme ids.
 
 Blockly's previous/next statement connections do the stack-shape enforcement
 for free — a morpheme chain is linear and order-strict (stem first, a
@@ -42,28 +43,31 @@ read-only block stack would.
 
 - **Engine**: [`jandahl/oq`](https://github.com/jandahl/oq)'s experimental
   `docs/public-api.js` (`buildWord`, `analyzeWordAsync`,
-  `mergeMorphemeSources`, `morphemeEntryToPreset`, `glossSummary`,
-  `GRAMMAR_MORPHEMES_URL`). Note: the richer, structured `glossSummaryItems`
-  (which carries a short, blank-filled `shortGloss` per morpheme — closer to
-  oq's own Deconstruct pill display) exists inside oq but is **not yet on
-  the exported `public-api.js` surface** at the currently-deployed
-  `API_VERSION` (0.3.0) — only the string-joining `glossSummary` is exported,
-  so that's what `breakdown.js` parses. Revisit once oq exports it.
-  That module carries **no stability promise** while its `API_VERSION` is
-  `0.x` — any oq commit may rename, reshape, or drop an export.
+  `mergeMorphemeSources`, `morphemeEntryToPreset`, `glossSummaryItems`,
+  `GRAMMAR_MORPHEMES_URL`). That module carries **no stability promise**
+  while its `API_VERSION` is `0.x` — any oq commit may rename, reshape, or
+  drop an export.
   **The `jandahl/oq` source repo is private**, so a commit-pinned CDN URL
   (jsDelivr/raw.githubusercontent against the repo) is not reachable from a
-  browser at all — `oq-api.js` imports instead from oq's own published
-  GitHub Pages deployment (`https://oq.spacepope.dk/public-api.js`), exactly
-  the consumption path `public-api.md`'s own Quick Start assumes. That
-  deployment has **no per-commit version pinning** for `public-api.js` itself
-  (unlike the grammar JSON, which does publish `v<major>` snapshots — see
-  grammarian's CLAUDE.md), so this app always tracks oq's *currently
-  published* API. That's a real, live risk given the stated `0.x` posture —
-  a breaking oq deploy can break this app with no warning. If/when oq starts
-  versioning `public-api.js`'s published URL the way it already does its
-  grammar JSON, switch to that; until then, treat a broken build here as a
-  cue to check oq's recent commits, not necessarily a bug in this repo.
+  browser at all — `oq-api.js` imports instead from a live oq deployment,
+  exactly the consumption path `public-api.md`'s own Quick Start assumes.
+  Currently pointed at **`https://oq.dicknog.dk/public-api.js`** (owner's
+  bleeding-edge deployment, tracking oq's dev branch — `API_VERSION 0.7.0` at
+  time of writing, vs. `oq.spacepope.dk`'s master-tracked `0.3.0`), chosen
+  specifically because it carries `glossSummaryItems` on the exported
+  surface — `oq.spacepope.dk` didn't yet, which is why the breakdown view
+  used to parse `glossSummary()`'s joined strings instead of using the
+  richer, short-gloss-carrying function directly. Being bleeding-edge cuts
+  both ways: expect this to move or break *more* often than a master-tracked
+  deployment would, not less. Neither deployment offers per-commit version
+  pinning for `public-api.js` itself (unlike the grammar JSON, which does
+  publish `v<major>` snapshots — see grammarian's CLAUDE.md), so this app
+  always tracks whichever deployment `OQ_BASE` currently points at as of
+  *its* latest push, not a fixed commit. If/when oq starts versioning
+  `public-api.js`'s published URL the way it already does its grammar JSON,
+  switch to that; until then, treat a broken build here as a cue to check
+  oq's recent commits on whichever domain `OQ_BASE` names, not necessarily a
+  bug in this repo.
 - **Morpheme catalog**: fetched at runtime from oq's own
   `GRAMMAR_MORPHEMES_URL`, which points at
   [`jandahl-custom-KAL-grammarian`](https://github.com/jandahl/jandahl-custom-KAL-grammarian)'s

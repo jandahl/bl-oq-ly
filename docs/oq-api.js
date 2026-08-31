@@ -1,24 +1,21 @@
 // Re-exports oq's experimental public API. jandahl/oq's SOURCE repo is
 // private, so a commit-pinned CDN URL (jsdelivr/raw.githubusercontent
-// against the repo) is not reachable from a browser — the only live copy is
-// oq's own published GitHub Pages deployment, which public-api.md's own
-// Quick Start already assumes as the consumption path. That deployment has
-// no per-commit versioning for public-api.js itself (unlike the grammar JSON,
-// which does publish v<major> snapshots — see grammarian's CLAUDE.md), so
-// this always tracks oq's current published `master`. Per public-api.md's
-// stability posture ("API_VERSION is 0.x, any commit may rename, reshape, or
-// drop any export"), that is a real, documented risk — see README.md.
-const OQ_BASE = "https://oq.spacepope.dk/";
+// against the repo) is not reachable from a browser — the only live copies
+// are oq's own published deployments, which public-api.md's own Quick Start
+// already assumes as the consumption path. `public-api.md`'s stability
+// posture is explicit ("API_VERSION is 0.x, any commit may rename, reshape,
+// or drop any export"), so which deployment this points at is a live,
+// tracked decision — see README.md for the current choice and why.
+//
+// Currently pointed at oq.dicknog.dk (owner's bleeding-edge deployment,
+// tracking oq's dev branch rather than oq.spacepope.dk's master) because it
+// carries glossSummaryItems on the exported surface — oq.spacepope.dk's
+// deployed API_VERSION (0.3.0) didn't yet, which is why breakdown.js used to
+// parse glossSummary()'s joined strings instead. Being bleeding-edge cuts
+// both ways: expect this to move/break more often than a master-tracked
+// deployment would.
+const OQ_BASE = "https://oq.dicknog.dk/";
 
-// glossSummaryItems (structured, carries shortGloss) exists internally in
-// oq but is NOT part of the exported public-api.js surface on the version
-// currently deployed to oq.spacepope.dk (API_VERSION 0.3.0) — only the
-// string-joining glossSummary() is exported. public-api.md is explicit that
-// only the exported surface is safe to depend on ("everything else...is
-// internal plumbing, free to change without notice"), so breakdown.js parses
-// glossSummary's "marker+text — gloss" strings instead of importing the
-// unexported function directly. Revisit once glossSummaryItems (or the
-// shorter, blank-filled shortGloss it carries) ships on the exported surface.
 export const {
 	buildWord,
 	analyzeWord,
@@ -26,6 +23,7 @@ export const {
 	morphemeEntryToPreset,
 	mergeMorphemeSources,
 	glossSummary,
+	glossSummaryItems,
 	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
 } = await import(/* @vite-ignore */ `${OQ_BASE}public-api.js`);
