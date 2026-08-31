@@ -13,6 +13,9 @@ const browserGlobals = {
 	requestAnimationFrame: "readonly",
 	AbortController: "readonly",
 	console: "readonly",
+	location: "readonly",
+	history: "readonly",
+	URLSearchParams: "readonly",
 	// Loaded globally via <script> tags in index.html (blockly_compressed.js
 	// etc.), never imported — see docs/blocks.js's/theme.js's own comments on
 	// why this can't be a normal ES import.

@@ -7,6 +7,7 @@ import {
 import { renderBreakdown } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
+import { readState, writeState } from "./router.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
@@ -173,6 +174,42 @@ function setStatus(text, kind, meta) {
 	}
 }
 
+// --- Shareable-link state (router.js). Build's link stays in sync with the
+// on-canvas chain on every change (replaceState -- too frequent for real
+// browser history entries); mode switches and a successful Deconstruct both
+// push a real history entry, since those are deliberate, share-worthy
+// moments a learner would reasonably want Back/Forward to step through.
+function currentShareState() {
+	if (mode === "deconstruct") return { mode, word: lastDeconstructWord, chain: [] };
+	const chains = workspace ? topLevelChains(workspace) : [];
+	return { mode, word: "", chain: chains.length === 1 ? chains[0] : [] };
+}
+
+function syncURL({ push = false } = {}) {
+	const url = location.pathname + writeState(currentShareState()) + location.hash;
+	if (push) history.pushState(null, "", url);
+	else history.replaceState(null, "", url);
+}
+
+/** Applies a {mode, word, chain} state (from router.js's readState(),
+ * whether from the initial load or a popstate) to the live app -- the
+ * inverse of currentShareState(). Never itself touches the URL (the caller
+ * already has it, or is about to set it) so this can't cause a redundant
+ * history entry or clobber a state we're in the middle of restoring FROM. */
+function applyShareState(state) {
+	setMode(state.mode, { sync: false });
+	if (state.mode === "deconstruct") {
+		if (state.word) {
+			wordInput.value = state.word;
+			runDeconstruct();
+		}
+	} else if (state.chain.length > 0) {
+		renderChain(workspace, state.chain, presetsById, displayOptions());
+		workspace.scrollCenter();
+		refreshBuild();
+	}
+}
+
 function seqForChain(ids) {
 	const seq = [];
 	for (const id of ids) {
@@ -185,6 +222,12 @@ function seqForChain(ids) {
 
 function refreshBuild() {
 	if (mode !== "build" || !workspace) return;
+	// Keeps Build's link current with the canvas on every change -- cheap
+	// (replaceState, no history entry) and correct regardless of which
+	// early-return below fires, since the chain itself is already final by
+	// this point (topLevelChains() just read it) even when buildWord() goes
+	// on to reject it.
+	syncURL({ push: false });
 	const chains = topLevelChains(workspace);
 	if (chains.length === 0) {
 		setStatus("Drag a morpheme block in to begin.", "");
@@ -248,6 +291,10 @@ async function runDeconstruct() {
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
 		moveToBuilderBtn.hidden = false;
 		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
+		// A verified result is the share-worthy moment -- not every keystroke,
+		// and not a failed/no-match attempt (see currentShareState()'s use of
+		// lastDeconstructWord rather than the live input value).
+		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError") return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
@@ -296,7 +343,7 @@ function applyToolbox() {
 	closeOpenFlyout();
 }
 
-function setMode(next) {
+function setMode(next, { sync = true } = {}) {
 	mode = next;
 	modeBuildBtn.classList.toggle("active", next === "build");
 	modeBuildBtn.setAttribute("aria-selected", String(next === "build"));
@@ -315,7 +362,20 @@ function setMode(next) {
 		moveToBuilderBtn.hidden = true;
 		updateReadingLine(null);
 		setStatus("Type a word and press Deconstruct.", "");
+		// Cleared here (not just visually blanked) so currentShareState()
+		// never links to a stale previous result the UI no longer shows --
+		// applyShareState() repopulates these immediately via runDeconstruct()
+		// when the state being restored actually carries a word.
+		lastDeconstructIds = null;
+		lastDeconstructSeq = null;
+		lastDeconstructWord = "";
 	}
+	// sync:false when applyShareState() is driving this (initial load or a
+	// popstate) -- the URL either already matches (we just navigated there)
+	// or is about to be set by whatever applyShareState() does next
+	// (runDeconstruct()'s own syncURL(), or renderChain()+refreshBuild()'s),
+	// so pushing here too would create a redundant/premature history entry.
+	if (sync) syncURL({ push: true });
 }
 
 async function main() {
@@ -361,6 +421,18 @@ async function main() {
 		requestAnimationFrame(() => Blockly.svgResize(workspace));
 	});
 	filterInput.addEventListener("input", applyToolbox);
+
+	// Shareable links (router.js): restore whatever the page was loaded with
+	// -- a bare "/" degrades to today's plain default (build mode, empty
+	// canvas), same as before this feature existed. Back/Forward then just
+	// replays the same restore against each history entry's own URL.
+	// A bare "/" (nothing to restore) is left alone entirely -- applyShareState
+	// would otherwise still run setMode("build")'s own refreshBuild(), which
+	// immediately overwrites the "Loaded N morphemes" confirmation above with
+	// "Drag a morpheme block in to begin." for no reason connected to a link.
+	const initialState = readState(location.search);
+	if (initialState.mode !== "build" || initialState.word || initialState.chain.length > 0) applyShareState(initialState);
+	window.addEventListener("popstate", () => applyShareState(readState(location.search)));
 }
 
 main().catch((err) => {

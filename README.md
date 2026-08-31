@@ -131,6 +131,34 @@ Two further options, both persisted:
   every block has always shown. The other two let a learner test their own
   recall in one direction by hiding half the label.
 
+### Shareable links
+
+`docs/router.js` keeps the address bar in sync with what's actually on
+screen, so copying it hands someone else the exact same view:
+
+- **Build**: the on-canvas chain — `?chain=qimmeq,N_qaq_Vb,V_IND_INTR_1SG`.
+  Kept live via `history.replaceState` on every canvas change (no history
+  spam from every drag).
+- **Deconstruct**: the analyzed word, once a verified breakdown is found —
+  `?mode=deconstruct&word=qimmeqarpunga`. Pushed via `history.pushState`
+  (a real, Back/Forward-navigable moment), not on every keystroke or a
+  failed/no-match attempt.
+- Switching mode also pushes a history entry, so Back/Forward steps through
+  mode switches the way a learner would expect.
+
+Loading either kind of link restores it automatically: a `chain` link
+rebuilds the same stack via `renderChain()`; a `mode=deconstruct&word=...`
+link re-runs the analysis. A bare `/` (nothing to restore) is left alone
+entirely, so the ordinary "Loaded N morphemes" startup message isn't
+immediately overwritten by Build's own empty-canvas status.
+
+Deliberately **not** in the URL: theme, language, spelling mode, show-ids,
+reading order, or the palette filter. Those are "how I like to see things,"
+not "what I'm looking at" — baking a sharer's own display preferences into
+a link would silently override whatever the recipient already has set, for
+no reason connected to the content being shared. They stay in
+`localStorage` (see "Display options" above), same as before this feature.
+
 ### Verb ending picker
 
 "Inflectional endings" replaces ~278 individual verb-mood ending entries
