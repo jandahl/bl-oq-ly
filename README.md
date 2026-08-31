@@ -79,21 +79,30 @@ Two checkboxes under the mode toggle, both persisted:
   stem-first: `buildWord()`'s own required sequence order, and the
   one-directional connection constraints below (a stem has no
   `previousConnection`, a word-final ending has no `nextConnection` — those
-  only make sense read in one consistent direction). If a literally reversed
-  block stack turns out to matter more than this tradeoff, that's a further
-  redesign, not a toggle.
-- **"Show morpheme ids"** (default off). Hides grammarian's internal ids
-  (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) from block labels, showing just the
-  gloss (toggle on to see the id again — useful for cross-referencing
-  against grammarian's own data). Toggling relabels every block already on
+  only make sense read in one consistent direction).
+  **Owner decision**: a fully reversible block stack (build in either
+  direction, not just read either direction) is real, tracked future work,
+  explicitly deferred rather than dropped — not a toggle to add casually on
+  top of the current one-directional connections, since that constraint (and
+  `buildWord()`'s own stem-first requirement) would need solving properly
+  first, not worked around per-toggle.
+- **"Show morpheme ids"** (default off). A block always shows the actual
+  Kalaallisut spelling (`preset.expected`, e.g. `qimmeq`, `-qaq`, `+voq`) —
+  that's real language, never hidden. This toggle only adds or removes
+  grammarian's own *internal* id (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) on top
+  of it, which happens to equal the spelling for a plain stem (its id *is*
+  its citation form) but is an opaque code for everything else — useful for
+  cross-referencing against grammarian's own data, off by default since it's
+  not what a learner needs to see. Toggling relabels every block already on
   the canvas (`blocks.js`'s `relabelBlocks()`), not just future ones.
 
-Deconstruct also separates a mood-marking morpheme's own grammatical
-category (`moodLabel` — "statement", "question", ...) from its gloss text
-into a small tag (`+voq` → *(statement)* `he/she/it`) instead of folding it
-into the gloss string with the same em-dash join every other row uses,
-which read as one more piece of translation rather than a distinct kind of
-information.
+A mood-marking morpheme's gloss also bakes its own grammatical category
+(`moodLabel` — "statement", "question", ...) into the string with the same
+em-dash join as everything else, which read as one more piece of translation
+rather than a distinct kind of information. Deconstruct separates it into
+its own small tag (`+voq` → *(statement)* `he/she/it`); a Build block drops
+it entirely instead — there's no room for a second annotation on an
+already-compact block label there.
 
 ### Directional connections
 

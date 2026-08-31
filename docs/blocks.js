@@ -63,10 +63,29 @@ function blockTypeForCategory(cat) {
 	return BLOCK_TYPE_PREFIX + cat.id;
 }
 
-/** @param {boolean} showIds - bl-oq-ly#10: hide grammarian's internal ids (e.g. "V_IND_INTR_1SG") by default */
+/**
+ * The actual Kalaallisut spelling (declared/citation form, with its
+ * +/-/± marker) always shows on the block, regardless of `showIds` — that's
+ * real language, not "linguist speak", and it's a different thing entirely
+ * from grammarian's own internal id (e.g. "N_qaq_Vb", "V_IND_INTR_1SG"),
+ * which happens to equal the spelling for a plain stem (its id IS its
+ * citation form) but is an opaque code for everything else. `showIds`
+ * toggles only that opaque id, on top of the spelling.
+ *
+ * A mood-marking morpheme's gloss also bakes its own moodLabel ("statement",
+ * "question", ...) into the string with the same em-dash join as everything
+ * else; unlike Deconstruct's breakdown view (which keeps it as a small
+ * separate tag), blocks drop it entirely -- bl-oq-ly#14, there's no room for
+ * a second annotation on an already-compact block label.
+ *
+ * @param {boolean} showIds - bl-oq-ly#10: also show grammarian's internal id
+ */
 function labelFor(preset, showIds) {
-	const gloss = preset.glossShort || preset.gloss || "(no gloss)";
-	const label = showIds ? `${preset.id} — ${gloss}` : gloss;
+	const spelling = preset.expected || preset.id;
+	const moodLabel = preset.plainGloss?.en_mood_label;
+	const rawGloss = preset.glossShort || preset.gloss || "(no gloss)";
+	const gloss = moodLabel && rawGloss.startsWith(`${moodLabel} — `) ? rawGloss.slice(moodLabel.length + 3) : rawGloss;
+	const label = showIds ? `${preset.id} — ${spelling} — ${gloss}` : `${spelling} — ${gloss}`;
 	return label.slice(0, 60);
 }
 
