@@ -118,6 +118,48 @@ its own small tag (`+voq` → *(statement)* `he/she/it`); a Build block drops
 it entirely instead — there's no room for a second annotation on an
 already-compact block label there.
 
+Two further options, both persisted:
+
+- **Language** (`#opt-lang`, English/Dansk). Selects which of grammarian's
+  own `plain_gloss.en`/`da` (and `en_short`/`da_short`) fields block labels
+  and Deconstruct's translation line draw from, via `glossSummaryItems(seq,
+  {lang})`. Danish coverage isn't complete across every entry yet (a
+  grammarian-side rollout in progress); a missing Danish gloss falls back to
+  English rather than showing nothing.
+- **Spelling visibility** (`#opt-spelling`, both / spelling-only /
+  gloss-only). "Both" (default) shows the em-dash-joined `spelling — gloss`
+  every block has always shown. The other two let a learner test their own
+  recall in one direction by hiding half the label.
+
+### Verb ending picker
+
+"Inflectional endings" replaces ~278 individual verb-mood ending entries
+(one per real mood × transitivity × subject × object combination — a flat
+scroll no learner should have to search) with a single conjugation-style
+picker block at the top of the category (bl-oq-ly#18). Four plain Blockly
+`FieldDropdown`s — mood, transitivity, subject, object (object hidden for
+an intransitive mood) — resolve live to a real morpheme id, shown on the
+block itself (`buildWord`'s own spelling + gloss); a fifth "variant"
+dropdown appears only for the ~23 real endings that share identical
+paradigm coordinates (e.g. plain vs. negative contemporative), letting the
+learner choose between them. `docs/verb-endings.js` builds the paradigm
+index from grammarian's own catalog and looks up candidates by coordinate;
+`docs/blocks.js` owns the block/field wiring.
+
+Subject and object are each a single combined "I"/"you"/"he, she, it"/...
+choice (not separate person and number dropdowns) — the same pairing oq's
+own "conjugate to..." modal uses. Label text throughout (mood names,
+person/number wording) comes from oq's public API (`resolveMoodLabel`/
+`resolvePersonLabel`, oq#881) — the exact plain-language wording oq's own
+conjugation modal shows by default ("statement", not "indicative"), honoring
+the visitor's stored pronoun preference for the two gendered combinations
+(3sg/4sg) — rather than this repo maintaining an independent rendering of
+the same categories. Both functions are threaded in as parameters from
+`app.js` (which is the only module that imports `oq-api.js`'s live,
+network-backed re-export of oq's public API) rather than imported directly
+by `verb-endings.js`/`blocks.js`, so those two stay plain, dependency-free
+and unit-testable under Node.
+
 ### Directional connections
 
 A stem's block has no `previousConnection` at all (nothing can ever precede

@@ -26,7 +26,7 @@ test("buildToolbox: groups presets into the right category by morpheme_type + wo
 		preset({ id: "aagialip", morpheme_type: "stem", word_class: "V" }),
 		preset({ id: "N_qaq_Vb", morpheme_type: "derivational_affix", word_class: "" }),
 	];
-	const toolbox = buildToolbox(presets, false);
+	const toolbox = buildToolbox(presets, { showIds: false });
 	const names = toolbox.contents.map((c) => c.name);
 	assert.ok(names.some((n) => n.startsWith("Stems — nouns (1)")));
 	assert.ok(names.some((n) => n.startsWith("Stems — verbs (1)")));
@@ -35,7 +35,7 @@ test("buildToolbox: groups presets into the right category by morpheme_type + wo
 
 test("buildToolbox: a category with zero matching presets doesn't appear at all (regression guard for the filter box feeling 'live')", () => {
 	const presets = [preset({ id: "qimmeq", morpheme_type: "stem", word_class: "N" })];
-	const toolbox = buildToolbox(presets, false);
+	const toolbox = buildToolbox(presets, { showIds: false });
 	const names = toolbox.contents.map((c) => c.name);
 	assert.ok(!names.some((n) => n.startsWith("Enclitics")));
 	assert.ok(!names.some((n) => n.startsWith("Particles")));
@@ -50,8 +50,13 @@ test("buildToolbox: showIds=false shows only the real Kalaallisut spelling + glo
 		word_class: "",
 		plainGloss: { en_mood_label: "statement" },
 	})];
-	const toolbox = buildToolbox(presets, false);
-	const label = toolbox.contents[0].contents[0].fields.LABEL;
+	const toolbox = buildToolbox(presets, { showIds: false });
+	// "Inflectional endings" always gets the verb ending picker block
+	// unshifted at index 0 (bl-oq-ly#18) -- find this entry by its own data
+	// rather than assume a position.
+	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
+	const entry = category.contents.find((b) => b.data === "V_IND_INTR_1SG");
+	const label = entry.fields.LABEL;
 	assert.equal(label, "-vunga — I");
 	assert.ok(!label.includes("V_IND_INTR_1SG"), "internal id must not leak into the label when showIds is off");
 	assert.ok(!label.includes("statement"), "mood label must be dropped from the block label entirely, not just hidden");
@@ -66,15 +71,32 @@ test("buildToolbox: showIds=true adds the internal id in front, without losing t
 		word_class: "",
 		plainGloss: { en_mood_label: "statement" },
 	})];
-	const toolbox = buildToolbox(presets, true);
-	const label = toolbox.contents[0].contents[0].fields.LABEL;
-	assert.equal(label, "V_IND_INTR_1SG — -vunga — I");
+	const toolbox = buildToolbox(presets, { showIds: true });
+	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
+	const entry = category.contents.find((b) => b.data === "V_IND_INTR_1SG");
+	assert.equal(entry.fields.LABEL, "V_IND_INTR_1SG — -vunga — I");
 });
 
 test("buildToolbox: a stem's label uses its own id as the spelling (regression guard: this is why hiding ids used to also hide stem spellings by accident)", () => {
 	const presets = [preset({ id: "qimmeq", expected: "qimmeq", glossShort: "dog", morpheme_type: "stem", word_class: "N" })];
-	const toolbox = buildToolbox(presets, false);
+	const toolbox = buildToolbox(presets, { showIds: false });
 	assert.equal(toolbox.contents[0].contents[0].fields.LABEL, "qimmeq — dog");
+});
+
+test("buildToolbox: a real verb-mood ending (carrying inflection.subject) is excluded from the flat list -- it's only reachable via the conjugation picker (bl-oq-ly#18)", () => {
+	const presets = [preset({
+		id: "V_IND_INTR_1SG",
+		expected: "-vunga",
+		morpheme_type: "inflectional_ending",
+		word_class: "",
+		seq: [{ inflection: { mood: "indicative", transitivity: "intransitive", subject: { person: 1, number: "sg" } } }],
+	})];
+	const toolbox = buildToolbox(presets, { showIds: false });
+	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
+	assert.ok(!category.contents.some((b) => b.data === "V_IND_INTR_1SG"));
+	// The category still exists, containing only the picker block.
+	assert.equal(category.contents.length, 1);
+	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
 });
 
 test("chainFromTopBlock: walks a fake block stack via getNextBlock(), collecting each block's .data", () => {

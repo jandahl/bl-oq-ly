@@ -26,4 +26,14 @@ export const {
 	glossSummaryItems,
 	API_VERSION,
 	GRAMMAR_MORPHEMES_URL,
+	// Resolved conjugation labels (oq#881, API_VERSION 0.8.0+) — the same
+	// friendly text oq's own "conjugate to..." modal shows for a mood/person
+	// paradigm coordinate, so the verb ending picker doesn't have to
+	// re-derive its own wording independently. See verb-endings.js.
+	resolveMoodLabel,
+	resolvePersonLabel,
+	resolveFieldLabel,
+	t,
+	setActiveLocale,
+	getActiveLocale,
 } = await import(/* @vite-ignore */ `${OQ_BASE}public-api.js`);

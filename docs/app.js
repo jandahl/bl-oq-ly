@@ -1,6 +1,9 @@
-import { buildWord, analyzeWordAsync, glossSummaryItems } from "./oq-api.js";
+import { buildWord, analyzeWordAsync, glossSummaryItems, resolveMoodLabel, resolvePersonLabel } from "./oq-api.js";
 import { loadCatalog } from "./catalog.js";
-import { defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks } from "./blocks.js";
+import {
+	defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks,
+	buildVerbEndingIndex, defineVerbEndingPickerBlock,
+} from "./blocks.js";
 import { renderBreakdown } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
@@ -21,6 +24,8 @@ const filterInput = document.getElementById("morpheme-filter");
 const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
 const showIdsCheckbox = document.getElementById("opt-show-ids");
 const readingOrderCheckbox = document.getElementById("opt-reading-order");
+const langSelect = document.getElementById("opt-lang");
+const spellingSelect = document.getElementById("opt-spelling");
 const readingLine = document.getElementById("reading-line");
 
 let mode = "build";
@@ -35,12 +40,20 @@ let lastDeconstructWord = "";
 let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
 
-// --- Display options (bl-oq-ly#10, #11), persisted like the theme.
+// --- Display options (bl-oq-ly#10, #11, #17), persisted like the theme.
+// `displayOptions()` is the single source of truth passed into every
+// labelFor()-consuming call (blocks.js's buildToolbox/renderChain/
+// relabelBlocks, breakdown.js/gloss.js's glossSummaryItems lang) so all of
+// them stay in sync with each other -- the earlier "hiding ids also hid the
+// spelling" bug (bl-oq-ly#14) came from exactly this kind of state living in
+// two places instead of one.
 const SHOW_IDS_KEY = "bl-oq-ly:show-ids";
 const READING_ORDER_KEY = "bl-oq-ly:reading-order";
+const LANG_KEY = "bl-oq-ly:lang";
+const SPELLING_KEY = "bl-oq-ly:spelling-mode";
 
-function showIds() {
-	return showIdsCheckbox.checked;
+function displayOptions() {
+	return { showIds: showIdsCheckbox.checked, lang: langSelect.value, spellingMode: spellingSelect.value };
 }
 
 function readLastFirst() {
@@ -50,10 +63,27 @@ function readLastFirst() {
 function initDisplayOptions() {
 	showIdsCheckbox.checked = localStorage.getItem(SHOW_IDS_KEY) === "true";
 	readingOrderCheckbox.checked = localStorage.getItem(READING_ORDER_KEY) !== "false"; // default on
+	langSelect.value = localStorage.getItem(LANG_KEY) === "da" ? "da" : "en";
+	spellingSelect.value = ["both", "spelling-only", "gloss-only"].includes(localStorage.getItem(SPELLING_KEY))
+		? localStorage.getItem(SPELLING_KEY) : "both";
+
+	function onDisplayOptionChange() {
+		if (workspace) relabelBlocks(workspace, presetsById, displayOptions());
+		applyToolbox();
+		refreshBuild();
+		if (lastDeconstructIds) rerenderBreakdown();
+	}
 	showIdsCheckbox.addEventListener("change", () => {
 		localStorage.setItem(SHOW_IDS_KEY, String(showIdsCheckbox.checked));
-		if (workspace) relabelBlocks(workspace, presetsById, showIds());
-		applyToolbox();
+		onDisplayOptionChange();
+	});
+	langSelect.addEventListener("change", () => {
+		localStorage.setItem(LANG_KEY, langSelect.value);
+		onDisplayOptionChange();
+	});
+	spellingSelect.addEventListener("change", () => {
+		localStorage.setItem(SPELLING_KEY, spellingSelect.value);
+		onDisplayOptionChange();
 	});
 	readingOrderCheckbox.addEventListener("change", () => {
 		localStorage.setItem(READING_ORDER_KEY, String(readingOrderCheckbox.checked));
@@ -83,7 +113,7 @@ function updateReadingLine(seq) {
 		readingLine.hidden = true;
 		return;
 	}
-	readingLine.textContent = composedTranslation(glossSummaryItems(seq));
+	readingLine.textContent = composedTranslation(glossSummaryItems(seq, { lang: displayOptions().lang }));
 	readingLine.hidden = false;
 }
 
@@ -187,7 +217,10 @@ function refreshBuild() {
 
 function rerenderBreakdown() {
 	if (!lastDeconstructSeq) return;
-	renderBreakdown(breakdownDiv, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, { reverseOrder: readLastFirst() });
+	renderBreakdown(breakdownDiv, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, {
+		reverseOrder: readLastFirst(),
+		lang: displayOptions().lang,
+	});
 }
 
 async function runDeconstruct() {
@@ -226,7 +259,7 @@ function moveToBuilder() {
 	const ids = lastDeconstructIds;
 	setMode("build");
 	Blockly.svgResize(workspace);
-	renderChain(workspace, ids, presetsById, showIds());
+	renderChain(workspace, ids, presetsById, displayOptions());
 	workspace.scrollCenter(); // the toolbox otherwise covers a stack placed at the workspace's default (20, 20) origin
 	refreshBuild();
 }
@@ -254,9 +287,12 @@ function applyToolbox() {
 		? presets.filter((p) => p.id.toLowerCase().includes(q) || (p.glossShort || p.gloss || "").toLowerCase().includes(q))
 		: presets;
 	// Rebuilt every time from scratch (no cached "full" toolbox), since
-	// showIds() can change independently of the filter and both need to be
-	// reflected together.
-	workspace.updateToolbox(buildToolbox(filtered, showIds()));
+	// display options can change independently of the filter and both need
+	// to be reflected together. The verb ending picker has no id/gloss text
+	// to match a query, so it's excluded from a filtered view entirely
+	// (bl-oq-ly#18) rather than left showing as an always-present,
+	// unrelated "Inflectional endings (1)" category.
+	workspace.updateToolbox(buildToolbox(filtered, displayOptions(), { includeVerbPicker: !q }));
 	closeOpenFlyout();
 }
 
@@ -292,9 +328,11 @@ async function main() {
 	presetsById = new Map(presets.map((p) => [p.id, p]));
 
 	defineMorphemeBlocks();
+	const verbEndingIndex = buildVerbEndingIndex(presets);
+	defineVerbEndingPickerBlock(verbEndingIndex, presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
 
 	workspace = Blockly.inject(blocklyDiv, {
-		toolbox: buildToolbox(presets, showIds()),
+		toolbox: buildToolbox(presets, displayOptions()),
 		theme: isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light,
 		trashcan: true,
 		zoom: { controls: true, wheel: true },
