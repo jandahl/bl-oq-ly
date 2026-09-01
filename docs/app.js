@@ -8,6 +8,7 @@ import { renderBreakdown, renderAlternativeBreakdowns } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState } from "./router.js";
+import { loadWorkedExamples } from "./worked-examples.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
@@ -25,6 +26,12 @@ const filterInput = document.getElementById("morpheme-filter");
 const blocklyThemeSelect = document.getElementById("blockly-theme-select");
 const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
 const exampleWordButtons = document.querySelectorAll("[data-example-word]");
+const workedExamplesBtn = document.getElementById("worked-examples-btn");
+const workedExamplesModal = document.getElementById("worked-examples-modal");
+const workedExamplesClose = document.getElementById("worked-examples-close");
+const workedExamplesFilter = document.getElementById("worked-examples-filter");
+const workedExamplesStatus = document.getElementById("worked-examples-status");
+const workedExamplesList = document.getElementById("worked-examples-list");
 const showIdsCheckbox = document.getElementById("opt-show-ids");
 const readingOrderCheckbox = document.getElementById("opt-reading-order");
 const langSelect = document.getElementById("opt-lang");
@@ -44,6 +51,7 @@ let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
 let lastDeconstructAlternatives = null;
 let selectedBlocklyTheme = "classic";
+let workedExamples = [];
 
 // --- Display options (bl-oq-ly#10, #11, #17), persisted like the theme.
 // `displayOptions()` is the single source of truth passed into every
@@ -59,6 +67,39 @@ const SPELLING_KEY = "bl-oq-ly:spelling-mode";
 
 function displayOptions() {
 	return { showIds: showIdsCheckbox.checked, lang: langSelect.value, spellingMode: spellingSelect.value };
+}
+
+function selectExample(word) {
+	setMode("deconstruct");
+	wordInput.value = word;
+	runDeconstruct();
+}
+
+function renderWorkedExamples() {
+	const query = workedExamplesFilter.value.trim().toLowerCase();
+	const matches = workedExamples.filter((example) =>
+		!query || `${example.surface} ${example.gloss ?? ""}`.toLowerCase().includes(query));
+	workedExamplesStatus.textContent = `${matches.length} of ${workedExamples.length} examples`;
+	workedExamplesList.replaceChildren(...matches.map((example) => {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.dataset.exampleWord = example.surface;
+		button.textContent = example.gloss ? `${example.surface} — ${example.gloss}` : example.surface;
+		if (example.gloss) button.title = example.gloss;
+		return button;
+	}));
+}
+
+async function openWorkedExamples() {
+	workedExamplesModal.showModal();
+	if (workedExamples.length) return;
+	workedExamplesStatus.textContent = "Loading examples…";
+	try {
+		workedExamples = await loadWorkedExamples();
+		renderWorkedExamples();
+	} catch (err) {
+		workedExamplesStatus.textContent = `Could not load the CI example set: ${err.message}`;
+	}
 }
 
 function readLastFirst() {
@@ -455,12 +496,17 @@ async function main() {
 	modeDeconstructBtn.addEventListener("click", () => setMode("deconstruct"));
 	analyzeBtn.addEventListener("click", runDeconstruct);
 	for (const button of exampleWordButtons) {
-		button.addEventListener("click", () => {
-			setMode("deconstruct");
-			wordInput.value = button.dataset.exampleWord;
-			runDeconstruct();
-		});
+		button.addEventListener("click", () => selectExample(button.dataset.exampleWord));
 	}
+	workedExamplesBtn.addEventListener("click", openWorkedExamples);
+	workedExamplesClose.addEventListener("click", () => workedExamplesModal.close());
+	workedExamplesFilter.addEventListener("input", renderWorkedExamples);
+	workedExamplesList.addEventListener("click", (event) => {
+		const button = event.target.closest("button[data-example-word]");
+		if (!button) return;
+		workedExamplesModal.close();
+		selectExample(button.dataset.exampleWord);
+	});
 	wordInput.addEventListener("keydown", (e) => {
 		if (e.key === "Enter") runDeconstruct();
 	});

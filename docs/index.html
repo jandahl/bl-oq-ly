@@ -73,12 +73,33 @@
 			<h2 id="example-words-heading">Try an example</h2>
 			<p>Jump straight to a word in Deconstruct:</p>
 			<div class="example-word-list">
-				<button type="button" data-example-word="qimmeq">qimmeq</button>
-				<button type="button" data-example-word="qimmeqarpoq">qimmeqarpoq</button>
-				<button type="button" data-example-word="qimmeqarpunga">qimmeqarpunga</button>
+				<button type="button" data-example-word="qimmeq" data-example-class="noun">qimmeq</button>
+				<button type="button" data-example-word="aallarpoq" data-example-class="verb">aallarpoq</button>
+				<button type="button" data-example-word="qimmeqarpoq" data-example-class="derivational affix">qimmeqarpoq</button>
+				<button type="button" data-example-word="qimmeqarpunga" data-example-class="inflectional ending">qimmeqarpunga</button>
+				<button type="button" data-example-word="qimmequna" data-example-class="enclitic">qimmequna</button>
+				<button type="button" data-example-word="aamma" data-example-class="particle">aamma</button>
 			</div>
+			<button id="worked-examples-btn" type="button">Extended examples</button>
 		</section>
 	</main>
+
+	<dialog id="worked-examples-modal" aria-labelledby="worked-examples-heading">
+		<div class="modal-header">
+			<h2 id="worked-examples-heading">oq CI worked examples</h2>
+			<button id="worked-examples-close" type="button" aria-label="Close worked examples">×</button>
+		</div>
+		<p class="modal-description">
+			Attested examples from the grammarian corpus used by
+			<a href="https://github.com/jandahl/oq" target="_blank" rel="noreferrer">jandahl/oq</a>
+			for its build and Deconstruct CI checks.
+		</p>
+		<label class="modal-filter">Filter examples
+			<input id="worked-examples-filter" type="search" placeholder="Filter by word or gloss…" autocomplete="off" />
+		</label>
+		<p id="worked-examples-status" class="modal-status" aria-live="polite">Loading examples…</p>
+		<div id="worked-examples-list" class="worked-examples-list"></div>
+	</dialog>
 
 	<footer>
 		<p>
