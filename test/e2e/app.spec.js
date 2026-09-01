@@ -42,7 +42,7 @@ test("catalog loads with a real morpheme count and surfaces the non-authoritativ
 test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
 	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga");
-	await expect(page.locator(".breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 });
 
 async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText, dropX, dropY) {
@@ -212,7 +212,7 @@ test("Danish gloss language: block labels and Deconstruct's translation switch t
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
 	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
-	const translation = await page.textContent(".breakdown-translation");
+	const translation = await page.textContent("#primary-breakdown .breakdown-translation");
 	expect(translation.toLowerCase()).toContain("hund"); // Danish for "dog"
 });
 
@@ -299,11 +299,11 @@ test("Build: theme toggle actually re-themes Blockly's own chrome, not just the 
 
 test("Build: Blockly theme dropdown switches to Zelos and persists the choice", async ({ page }) => {
 	await page.selectOption("#blockly-theme-select", "zelos");
-	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toContain("zelos");
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
 	await page.reload();
 	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
 	await expect(page.locator("#blockly-theme-select")).toHaveValue("zelos");
-	await expect(page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toContain("zelos");
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
 });
 
 test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morpheme breakdown, not a raw id list (bl-oq-ly#4/#16)", async ({ page }) => {
@@ -312,13 +312,13 @@ test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morp
 	await page.click("#analyze-btn");
 	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 
-	await expect(page.locator(".breakdown-word")).toHaveText("qimmeqarpunga");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga");
 	// The single most important regression this suite exists to prevent:
 	// bl-oq-ly shipped " · "-joined per-morpheme fragments TWICE where oq's
 	// own Deconstruct shows one composed sentence.
-	await expect(page.locator(".breakdown-translation")).toHaveText("I have a dog");
+	await expect(page.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog");
 
-	const rows = page.locator(".breakdown-row");
+	const rows = page.locator("#primary-breakdown .breakdown-row");
 	await expect(rows).toHaveCount(3);
 	const rowText = await rows.allTextContents();
 	expect(rowText.some((t) => t.includes("qimmeq") && t.includes("dog"))).toBe(true);
@@ -350,14 +350,14 @@ test("Deconstruct: reading-order toggle reverses the rows but never the composed
 	// "Read last morpheme first" defaults ON (index.html's #opt-reading-order
 	// starts checked), so the FIRST row on a fresh Deconstruct is already the
 	// last morpheme (the mood ending), not the stem.
-	const firstRowEndingFirst = await page.locator(".breakdown-row").first().locator(".breakdown-spelling").textContent();
+	const firstRowEndingFirst = await page.locator("#primary-breakdown .breakdown-row").first().locator(".breakdown-spelling").textContent();
 	expect(firstRowEndingFirst).toContain("vunga");
 
 	await page.click("#opt-reading-order"); // turn off -> stem-first
 	await page.waitForTimeout(300);
-	const firstRowAfterToggle = await page.locator(".breakdown-row").first().locator(".breakdown-spelling").textContent();
+	const firstRowAfterToggle = await page.locator("#primary-breakdown .breakdown-row").first().locator(".breakdown-spelling").textContent();
 	expect(firstRowAfterToggle).toContain("qimmeq");
-	await expect(page.locator(".breakdown-translation")).toHaveText("I have a dog");
+	await expect(page.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog");
 });
 
 test("Deconstruct -> Move to Word Builder recreates the exact verified chain as connected, editable blocks (bl-oq-ly#8)", async ({ page }) => {
@@ -482,7 +482,7 @@ test("Shareable links: a verified Deconstruct result pushes mode+word into the U
 	await expect(page2.locator("#mode-deconstruct")).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
 	await expect(page2.locator("#word-input")).toHaveValue("qimmeqarpunga");
 	await expect(page2.locator("#status")).toBeHidden({ timeout: 15_000 });
-	await expect(page2.locator(".breakdown-translation")).toHaveText("I have a dog");
+	await expect(page2.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog");
 	await page2.close();
 });
 

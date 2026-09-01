@@ -279,10 +279,14 @@ function refreshBuild() {
 
 function rerenderBreakdown() {
 	if (!lastDeconstructSeq) return;
-	renderBreakdown(breakdownDiv, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, {
+	breakdownDiv.innerHTML = "";
+	const primary = document.createElement("article");
+	primary.id = "primary-breakdown";
+	renderBreakdown(primary, lastDeconstructWord, lastDeconstructSeq, lastDeconstructBuilt, glossSummaryItems, {
 		reverseOrder: readLastFirst(),
 		lang: displayOptions().lang,
 	});
+	breakdownDiv.appendChild(primary);
 	renderAlternativeBreakdowns(breakdownDiv, lastDeconstructAlternatives, glossSummaryItems, {
 		word: lastDeconstructWord,
 		reverseOrder: readLastFirst(),
