@@ -67,9 +67,9 @@ test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ p
 	await expect(modal).toBeVisible();
 	await expect(modal.locator("#worked-examples-status")).toContainText("examples", { timeout: 20_000 });
 	await expect.poll(() => modal.locator("#worked-examples-list button").count(), { timeout: 20_000 }).toBeGreaterThan(400);
-	await modal.locator("#worked-examples-filter").fill("nerivoq");
+	await modal.locator("#worked-examples-filter").fill("nerivugut");
 	await expect(modal.locator("#worked-examples-list button")).toHaveCount(1);
-	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivoq");
+	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivugut");
 	await modal.locator("#worked-examples-close").click();
 	await expect(modal).toBeHidden();
 });
