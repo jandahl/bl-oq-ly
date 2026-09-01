@@ -241,33 +241,20 @@ concern that belongs in oq) as Blockly connection checks.
 
 ## Data sources
 
-- **Engine**: [`jandahl/oq`](https://github.com/jandahl/oq)'s experimental
-  `docs/public-api.js` (`buildWord`, `analyzeWordAsync`,
+- **Engine**: the versioned [`oq-api`](https://jandahl.github.io/oq-api/)
+  browser package (`buildWord`, `analyzeWordAsync`,
   `mergeMorphemeSources`, `morphemeEntryToPreset`, `glossSummaryItems`,
   `GRAMMAR_MORPHEMES_URL`). That module carries **no stability promise**
   while its `API_VERSION` is `0.x` — any oq commit may rename, reshape, or
   drop an export.
   **The `jandahl/oq` source repo is private**, so a commit-pinned CDN URL
   (jsDelivr/raw.githubusercontent against the repo) is not reachable from a
-  browser at all — `oq-api.js` imports instead from a live oq deployment,
-  exactly the consumption path `public-api.md`'s own Quick Start assumes.
-  Currently pointed at **`https://oq.dicknog.dk/public-api.js`** (owner's
-  bleeding-edge deployment, tracking oq's dev branch — `API_VERSION 0.7.0` at
-  time of writing, vs. `oq.spacepope.dk`'s master-tracked `0.3.0`), chosen
-  specifically because it carries `glossSummaryItems` on the exported
-  surface — `oq.spacepope.dk` didn't yet, which is why the breakdown view
-  used to parse `glossSummary()`'s joined strings instead of using the
-  richer, short-gloss-carrying function directly. Being bleeding-edge cuts
-  both ways: expect this to move or break *more* often than a master-tracked
-  deployment would, not less. Neither deployment offers per-commit version
-  pinning for `public-api.js` itself (unlike the grammar JSON, which does
-  publish `v<major>` snapshots — see grammarian's CLAUDE.md), so this app
-  always tracks whichever deployment `OQ_BASE` currently points at as of
-  *its* latest push, not a fixed commit. If/when oq starts versioning
-  `public-api.js`'s published URL the way it already does its grammar JSON,
-  switch to that; until then, treat a broken build here as a cue to check
-  oq's recent commits on whichever domain `OQ_BASE` names, not necessarily a
-  bug in this repo.
+  browser at all — `oq-api.js` imports the published package entry point
+  `https://jandahl.github.io/oq-api/api/v0.0.1/public-api.js`. The package
+  path is `v0.0.1`; the module's separate `API_VERSION` currently reports
+  the underlying engine's `0.9.0`. Treat a broken build as a cue to inspect
+  the published package contract and its upstream data source, not
+  necessarily as a bug in this repo.
 - **Morpheme catalog**: fetched at runtime from oq's own
   `GRAMMAR_MORPHEMES_URL`, which points at
   [`jandahl-custom-KAL-grammarian`](https://github.com/jandahl/jandahl-custom-KAL-grammarian)'s
@@ -320,8 +307,8 @@ one-off script written by hand each round and thrown away afterward.
 push instead of only when someone happens to remember to re-check by hand;
 each test names which past bug it guards against.
 
-`playwright.config.js` points the E2E suite at oq.dicknog.dk and
-grammarian's live published catalog, not a frozen local fixture — see that
+`playwright.config.js` points the E2E suite at the published oq-api package
+and grammarian's live published catalog, not frozen local fixtures — see that
 file's own comment. This repo's stated posture throughout is that a broken
 build can be this repo's own bug *or* an upstream oq/grammarian break (both
 carry no stability promise — see "Data sources" above), and only testing

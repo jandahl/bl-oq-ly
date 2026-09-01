@@ -4,7 +4,7 @@
 // hand each round and thrown away afterward. Every scenario here caught a
 // real shipped bug at least once (see each test's own comment for which).
 //
-// Deliberately hits oq.dicknog.dk and grammarian's live published catalog
+// Deliberately hits the published oq-api package and grammarian's live catalog
 // (see playwright.config.js's own comment) rather than a local fixture —
 // this repo's whole stated posture is that a break here can be this repo's
 // own bug OR an upstream one, and only testing against a frozen local
