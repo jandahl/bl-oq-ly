@@ -39,6 +39,12 @@ test("catalog loads with a real morpheme count and surfaces the non-authoritativ
 	expect(status).toContain("hand-authored, not yet dictionary-verified");
 });
 
+test("Deconstruct: example words load into the analyzer", async ({ page }) => {
+	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
+	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga");
+	await expect(page.locator(".breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
+});
+
 async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText, dropX, dropY) {
 	const category = page.locator(".blocklyTreeLabel").filter({ hasText: categoryLabelText }).first();
 	await category.click({ force: true });
