@@ -36,6 +36,7 @@ let presets = [];
 let presetsById = new Map();
 let workspace = null;
 let deconstructAbort = null;
+let deconstructRun = 0;
 let paletteVisible = true;
 let lastDeconstructIds = null;
 let blocklyThemes = null;
@@ -297,8 +298,9 @@ function rerenderBreakdown() {
 
 async function runDeconstruct() {
 	const word = wordInput.value.trim();
-	if (!word) return;
 	if (deconstructAbort) deconstructAbort.abort();
+	const run = ++deconstructRun;
+	if (!word) return;
 	deconstructAbort = new AbortController();
 	breakdownDiv.innerHTML = "";
 	moveToBuilderBtn.hidden = true;
@@ -308,6 +310,10 @@ async function runDeconstruct() {
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
+		// AbortController is advisory: an upstream implementation may still
+		// resolve after abort. Never let that stale result replace a newer
+		// analysis (or one started before the user switched modes).
+		if (run !== deconstructRun) return;
 		if (!result.matches || result.matches.length === 0) {
 			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
 			return;
@@ -327,7 +333,7 @@ async function runDeconstruct() {
 		// lastDeconstructWord rather than the live input value).
 		syncURL({ push: true });
 	} catch (err) {
-		if (err?.name === "AbortError") return;
+		if (err?.name === "AbortError" || run !== deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
 }
@@ -375,6 +381,14 @@ function applyToolbox() {
 }
 
 function setMode(next, { sync = true } = {}) {
+	// Invalidate any in-flight analysis before changing what is visible. This
+	// protects the Build view from a late Deconstruct response even when the
+	// API does not observe AbortController promptly.
+	deconstructRun++;
+	if (deconstructAbort) {
+		deconstructAbort.abort();
+		deconstructAbort = null;
+	}
 	mode = next;
 	modeBuildBtn.classList.toggle("active", next === "build");
 	modeBuildBtn.setAttribute("aria-selected", String(next === "build"));
