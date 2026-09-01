@@ -174,6 +174,16 @@ main {
 	color: var(--fg);
 }
 .palette-controls input[hidden] { display: none; }
+.blockly-theme-control { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; }
+.blockly-theme-control select {
+	padding: 0.25rem 0.35rem;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--panel-bg);
+	color: var(--fg);
+	font: inherit;
+	cursor: pointer;
+}
 
 /* Blockly's toolbox/flyout/workspace chrome is themed via the supported
    Blockly.Theme API (theme.js) rather than CSS, and kept in sync with this

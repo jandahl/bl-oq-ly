@@ -67,12 +67,13 @@ read-only block stack would.
 
 A three-way Auto/Light/Dark toggle (top right, persisted in `localStorage`)
 sets `<html data-theme="...">`, which `style.css` reads (an explicit choice
-always wins over the OS; "Auto" falls back to `prefers-color-scheme`). Blockly
-itself doesn't read CSS custom properties at all, so its toolbox/flyout/
-workspace chrome is themed separately via `theme.js`'s two `Blockly.Theme`
-objects and `workspace.setTheme()`, kept in sync with the page's own theme by
-`app.js` on every toggle (and live on an OS-level change, while "Auto" is
-active). An earlier version forced Blockly's toolbox text to a fixed dark
+always wins over the OS; "Auto" falls back to `prefers-color-scheme`). The
+Builder page also offers a persisted Blockly theme choice (Classic or Zelos).
+Blockly itself doesn't read CSS custom properties at all, so its toolbox/flyout/
+workspace chrome is themed separately via `theme.js`'s theme objects and
+`workspace.setTheme()`, kept in sync with the page's own theme by `app.js` on
+every toggle (and live on an OS-level change, while "Auto" is active). An
+earlier version forced Blockly's toolbox text to a fixed dark
 colour via a blanket CSS override — readable, but meant Blockly's own chrome
 could never actually go dark; this replaces that hack with real theming.
 

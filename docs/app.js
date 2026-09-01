@@ -22,6 +22,7 @@ const breakdownDiv = document.getElementById("breakdown");
 const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterInput = document.getElementById("morpheme-filter");
+const blocklyThemeSelect = document.getElementById("blockly-theme-select");
 const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
 const exampleWordButtons = document.querySelectorAll("[data-example-word]");
 const showIdsCheckbox = document.getElementById("opt-show-ids");
@@ -42,6 +43,7 @@ let lastDeconstructWord = "";
 let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
 let lastDeconstructAlternatives = null;
+let selectedBlocklyTheme = "classic";
 
 // --- Display options (bl-oq-ly#10, #11, #17), persisted like the theme.
 // `displayOptions()` is the single source of truth passed into every
@@ -138,7 +140,21 @@ function isEffectivelyDark() {
 }
 
 function syncBlocklyTheme() {
-	if (workspace && blocklyThemes) workspace.setTheme(isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light);
+	if (workspace && blocklyThemes) {
+		const themeSet = blocklyThemes[selectedBlocklyTheme] || blocklyThemes.classic;
+		workspace.setTheme(isEffectivelyDark() ? themeSet.dark : themeSet.light);
+	}
+}
+
+function initBlocklyTheme() {
+	const stored = localStorage.getItem("bl-oq-ly:blockly-theme");
+	selectedBlocklyTheme = ["classic", "zelos"].includes(stored) ? stored : "classic";
+	blocklyThemeSelect.value = selectedBlocklyTheme;
+	blocklyThemeSelect.addEventListener("change", () => {
+		selectedBlocklyTheme = blocklyThemeSelect.value;
+		localStorage.setItem("bl-oq-ly:blockly-theme", selectedBlocklyTheme);
+		syncBlocklyTheme();
+	});
 }
 
 function applyTheme(theme) {
@@ -164,6 +180,7 @@ function initTheme() {
 }
 
 function setStatus(text, kind, meta) {
+	statusEl.hidden = false;
 	statusEl.className = kind ?? "";
 	statusLine.textContent = text;
 	const oldMeta = statusEl.querySelector(".meta");
@@ -300,7 +317,7 @@ async function runDeconstruct() {
 		rerenderBreakdown();
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
 		moveToBuilderBtn.hidden = false;
-		setStatus(`${result.matches.length} verified breakdown(s) found`, "ok");
+		statusEl.hidden = true;
 		// A verified result is the share-worthy moment -- not every keystroke,
 		// and not a failed/no-match attempt (see currentShareState()'s use of
 		// lastDeconstructWord rather than the live input value).
@@ -392,6 +409,7 @@ function setMode(next, { sync = true } = {}) {
 async function main() {
 	blocklyThemes = buildBlocklyThemes();
 	initTheme();
+	initBlocklyTheme();
 	initDisplayOptions();
 	setStatus("Loading morpheme catalog…", "");
 	const catalog = await loadCatalog();
@@ -405,7 +423,9 @@ async function main() {
 
 	workspace = Blockly.inject(blocklyDiv, {
 		toolbox: buildToolbox(presets, displayOptions()),
-		theme: isEffectivelyDark() ? blocklyThemes.dark : blocklyThemes.light,
+		theme: isEffectivelyDark()
+			? blocklyThemes[selectedBlocklyTheme].dark
+			: blocklyThemes[selectedBlocklyTheme].light,
 		trashcan: true,
 		// pinch: true (bl-oq-ly#20) -- a touch pinch gesture zooms the
 		// workspace, same as the on-screen +/- controls/mouse wheel above.
@@ -416,6 +436,7 @@ async function main() {
 		// gesture a learner reaches for to work around that -- Blockly
 		// doesn't enable it by default.
 		zoom: { controls: true, wheel: true, pinch: true },
+		sounds: false,
 		move: { scrollbars: true, drag: true, wheel: true },
 	});
 	workspace.addChangeListener(() => refreshBuild());
