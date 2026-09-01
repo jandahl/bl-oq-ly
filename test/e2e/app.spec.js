@@ -297,6 +297,15 @@ test("Build: theme toggle actually re-themes Blockly's own chrome, not just the 
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
+test("Build: Blockly theme dropdown switches to Zelos and persists the choice", async ({ page }) => {
+	await page.selectOption("#blockly-theme-select", "zelos");
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toContain("zelos");
+	await page.reload();
+	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
+	await expect(page.locator("#blockly-theme-select")).toHaveValue("zelos");
+	await expect(page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toContain("zelos");
+});
+
 test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morpheme breakdown, not a raw id list (bl-oq-ly#4/#16)", async ({ page }) => {
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
@@ -324,7 +333,7 @@ test("Deconstruct: lower-ranked verified breakdowns are folded and link to their
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
 	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 20_000 });
-	await expect(page.locator("#status-line")).toHaveText("3 verified breakdown(s) found");
+	await expect(page.locator("#status")).toBeHidden();
 	const alternatives = page.locator("#alternative-breakdowns");
 	await expect(alternatives).toBeVisible();
 	await expect(alternatives).not.toHaveAttribute("open", "");

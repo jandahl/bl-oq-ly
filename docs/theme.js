@@ -9,36 +9,42 @@
 // unconditionally — readable, but meant Blockly's own chrome could never
 // actually go dark to match a real dark-mode toggle (bl-oq-ly#7).
 
+function defineTheme(name, base, componentStyles) {
+	return Blockly.Theme.defineTheme(name, { base, componentStyles });
+}
+
 export function buildBlocklyThemes() {
-	const light = Blockly.Theme.defineTheme("bl-oq-ly-light", {
-		base: Blockly.Themes.Classic,
-		componentStyles: {
-			workspaceBackgroundColour: "#ffffff",
-			toolboxBackgroundColour: "#f7f5f0",
-			toolboxForegroundColour: "#1c1a16",
-			flyoutBackgroundColour: "#f0ede4",
-			flyoutForegroundColour: "#1c1a16",
-			flyoutOpacity: 1,
-			scrollbarColour: "#c9c2b0",
-			insertionMarkerColour: "#2a6f6f",
-			insertionMarkerOpacity: 0.3,
-		},
-	});
+	const lightStyles = {
+		workspaceBackgroundColour: "#ffffff",
+		toolboxBackgroundColour: "#f7f5f0",
+		toolboxForegroundColour: "#1c1a16",
+		flyoutBackgroundColour: "#f0ede4",
+		flyoutForegroundColour: "#1c1a16",
+		flyoutOpacity: 1,
+		scrollbarColour: "#c9c2b0",
+		insertionMarkerColour: "#2a6f6f",
+		insertionMarkerOpacity: 0.3,
+	};
+	const darkStyles = {
+		workspaceBackgroundColour: "#1f2224",
+		toolboxBackgroundColour: "#16181a",
+		toolboxForegroundColour: "#ece7dd",
+		flyoutBackgroundColour: "#26292b",
+		flyoutForegroundColour: "#ece7dd",
+		flyoutOpacity: 1,
+		scrollbarColour: "#5fb8b8",
+		insertionMarkerColour: "#5fb8b8",
+		insertionMarkerOpacity: 0.3,
+	};
 
-	const dark = Blockly.Theme.defineTheme("bl-oq-ly-dark", {
-		base: Blockly.Themes.Classic,
-		componentStyles: {
-			workspaceBackgroundColour: "#1f2224",
-			toolboxBackgroundColour: "#16181a",
-			toolboxForegroundColour: "#ece7dd",
-			flyoutBackgroundColour: "#26292b",
-			flyoutForegroundColour: "#ece7dd",
-			flyoutOpacity: 1,
-			scrollbarColour: "#5fb8b8",
-			insertionMarkerColour: "#5fb8b8",
-			insertionMarkerOpacity: 0.3,
-		},
-	});
+	const classic = {
+		light: defineTheme("bl-oq-ly-classic-light", Blockly.Themes.Classic, lightStyles),
+		dark: defineTheme("bl-oq-ly-classic-dark", Blockly.Themes.Classic, darkStyles),
+	};
+	const zelos = {
+		light: defineTheme("bl-oq-ly-zelos-light", Blockly.Themes.Zelos, lightStyles),
+		dark: defineTheme("bl-oq-ly-zelos-dark", Blockly.Themes.Zelos, darkStyles),
+	};
 
-	return { light, dark };
+	return { classic, zelos, light: classic.light, dark: classic.dark };
 }
