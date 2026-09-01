@@ -78,3 +78,44 @@ export function renderBreakdown(container, word, seq, buildResult, glossSummaryI
 		container.appendChild(note);
 	}
 }
+
+/**
+ * Adds the lower-ranked verified analyses below the primary breakdown. They
+ * stay collapsed so the best-ranked explanation remains the easy-to-read
+ * default, while each alternative remains directly usable as a builder link.
+ * @param {HTMLElement} container
+ * @param {{ seq: any[], built: any }[]} alternatives
+ * @param {(seq: any[], opts?: any) => any[]} glossSummaryItems
+ * @param {{ reverseOrder?: boolean, lang?: "en"|"da", builderHref?: (seq: any[]) => string }} [opts]
+ */
+export function renderAlternativeBreakdowns(container, alternatives, glossSummaryItems, opts = {}) {
+	if (!alternatives?.length) return;
+
+	const details = document.createElement("details");
+	details.id = "alternative-breakdowns";
+	details.className = "alternative-breakdowns";
+	const summary = document.createElement("summary");
+	summary.textContent = `Other verified breakdowns (${alternatives.length})`;
+	details.appendChild(summary);
+
+	const list = document.createElement("div");
+	list.className = "alternative-breakdown-list";
+	for (const alternative of alternatives) {
+		const entry = document.createElement("article");
+		entry.className = "alternative-breakdown";
+		const content = document.createElement("div");
+		renderBreakdown(content, opts.word || alternative.built.word, alternative.seq, alternative.built, glossSummaryItems, opts);
+		entry.appendChild(content);
+
+		if (opts.builderHref) {
+			const link = document.createElement("a");
+			link.className = "breakdown-builder-link";
+			link.href = opts.builderHref(alternative.seq);
+			link.textContent = "Open this breakdown in Word Builder →";
+			entry.appendChild(link);
+		}
+		list.appendChild(entry);
+	}
+	details.appendChild(list);
+	container.appendChild(details);
+}

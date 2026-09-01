@@ -283,6 +283,33 @@ main {
 	color: var(--approx);
 }
 
+.alternative-breakdowns {
+	margin-top: 1rem;
+	border-top: 1px solid var(--border);
+	padding-top: 0.75rem;
+}
+.alternative-breakdowns summary {
+	color: var(--accent);
+	cursor: pointer;
+	font-weight: 600;
+}
+.alternative-breakdown-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+}
+.alternative-breakdown {
+	padding-top: 0.8rem;
+	border-top: 1px solid var(--border);
+}
+.alternative-breakdown .breakdown-word { font-size: 1.2rem; }
+.breakdown-builder-link {
+	display: inline-block;
+	margin-top: 0.7rem;
+	font-size: 0.85rem;
+	color: var(--accent);
+}
+
 .reading-line {
 	margin: 0;
 	padding: 0.5rem 0.9rem;
