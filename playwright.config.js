@@ -1,8 +1,9 @@
 // @ts-check
 import { defineConfig, devices } from "@playwright/test";
 
-// Deliberately hits the REAL live endpoints (oq.dicknog.dk, grammarian's
-// published morphemes.json) rather than a local mirror — see README's
+// Deliberately hits the REAL live endpoints (the published oq-api v0.0.1
+// module and grammarian's published morphemes.json) rather than a local
+// mirror — see README's
 // "Testing" section for why: this repo's own stated stance is that a broken
 // build here is a cue to check those upstreams, and a test suite that only
 // ever exercises a frozen local snapshot would never catch that class of
