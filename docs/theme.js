@@ -9,8 +9,61 @@
 // unconditionally — readable, but meant Blockly's own chrome could never
 // actually go dark to match a real dark-mode toggle (bl-oq-ly#7).
 
-function defineTheme(name, base, componentStyles) {
-	return Blockly.Theme.defineTheme(name, { base, componentStyles });
+import { WORD_CLASS_THEMES, getWordClassColors } from "./oq-api.js";
+
+// oq's public API owns the canonical word-class palette. Blockly uses the
+// medium `border` tone as its solid block/category colour because oq's `fill`
+// is intentionally a very pale/dark card background; using it as a solid
+// Blockly block would make Blockly's white field text illegible in the light
+// theme. Shadow and edge rendering still use the same API colour triple.
+const OQ_STYLE_PATHS = {
+	oq_nominal: ["nominal_root"],
+	oq_verbal: ["verbal_root"],
+	oq_derivational: ["derivational_affix"],
+	oq_inflectional: ["inflectional_affix"],
+	oq_enclitic: ["enclitic"],
+	oq_neutral: [],
+};
+
+/** Blockly 11 rejects CSS hsl() strings, while oq's canonical API returns
+ * exactly that format. Convert only the representation at this boundary;
+ * the colour coordinates themselves remain API-owned. */
+function blocklyColour(hsl) {
+	const match = /^hsl\((-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)%,(\d+(?:\.\d+)?)%\)$/.exec(hsl);
+	if (!match) return hsl;
+	const hue = ((Number(match[1]) % 360) + 360) % 360;
+	const saturation = Number(match[2]) / 100;
+	const lightness = Number(match[3]) / 100;
+	const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+	const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1));
+	const offset = lightness - chroma / 2;
+	let rgb;
+	if (hue < 60) rgb = [chroma, x, 0];
+	else if (hue < 120) rgb = [x, chroma, 0];
+	else if (hue < 180) rgb = [0, chroma, x];
+	else if (hue < 240) rgb = [0, x, chroma];
+	else if (hue < 300) rgb = [x, 0, chroma];
+	else rgb = [chroma, 0, x];
+	return `#${rgb.map((channel) => Math.round((channel + offset) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function oqBlocklyStyles(oqTheme) {
+	const blockStyles = {};
+	const categoryStyles = {};
+	for (const [name, path] of Object.entries(OQ_STYLE_PATHS)) {
+		const colours = getWordClassColors(path, oqTheme);
+		blockStyles[`${name}_blocks`] = {
+			colourPrimary: blocklyColour(colours.border),
+			colourSecondary: blocklyColour(colours.fill),
+			colourTertiary: blocklyColour(colours.text),
+		};
+		categoryStyles[`${name}_category`] = { colour: blocklyColour(colours.border) };
+	}
+	return { blockStyles, categoryStyles };
+}
+
+function defineTheme(name, base, componentStyles, oqTheme) {
+	return Blockly.Theme.defineTheme(name, { base, componentStyles, ...oqBlocklyStyles(oqTheme) });
 }
 
 export function buildBlocklyThemes() {
@@ -38,12 +91,12 @@ export function buildBlocklyThemes() {
 	};
 
 	const classic = {
-		light: defineTheme("bl-oq-ly-classic-light", Blockly.Themes.Classic, lightStyles),
-		dark: defineTheme("bl-oq-ly-classic-dark", Blockly.Themes.Classic, darkStyles),
+		light: defineTheme("bl-oq-ly-classic-light", Blockly.Themes.Classic, lightStyles, WORD_CLASS_THEMES.light),
+		dark: defineTheme("bl-oq-ly-classic-dark", Blockly.Themes.Classic, darkStyles, WORD_CLASS_THEMES.default),
 	};
 	const zelos = {
-		light: defineTheme("bl-oq-ly-zelos-light", Blockly.Themes.Zelos, lightStyles),
-		dark: defineTheme("bl-oq-ly-zelos-dark", Blockly.Themes.Zelos, darkStyles),
+		light: defineTheme("bl-oq-ly-zelos-light", Blockly.Themes.Zelos, lightStyles, WORD_CLASS_THEMES.light),
+		dark: defineTheme("bl-oq-ly-zelos-dark", Blockly.Themes.Zelos, darkStyles, WORD_CLASS_THEMES.default),
 	};
 
 	return { classic, zelos, light: classic.light, dark: classic.dark };

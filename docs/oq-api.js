@@ -32,4 +32,6 @@ export const {
 	t,
 	setActiveLocale,
 	getActiveLocale,
+	WORD_CLASS_THEMES,
+	getWordClassColors,
 } = await import(/* @vite-ignore */ OQ_API_URL);
