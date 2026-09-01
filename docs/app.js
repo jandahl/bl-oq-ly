@@ -43,6 +43,7 @@ let presets = [];
 let presetsById = new Map();
 let workspace = null;
 let deconstructAbort = null;
+let deconstructRun = 0;
 let paletteVisible = true;
 let lastDeconstructIds = null;
 let blocklyThemes = null;
@@ -194,8 +195,40 @@ function initBlocklyTheme() {
 	blocklyThemeSelect.addEventListener("change", () => {
 		selectedBlocklyTheme = blocklyThemeSelect.value;
 		localStorage.setItem("bl-oq-ly:blockly-theme", selectedBlocklyTheme);
-		syncBlocklyTheme();
+		rebuildWorkspace();
 	});
+}
+
+function workspaceOptions() {
+	const themeSet = blocklyThemes[selectedBlocklyTheme] || blocklyThemes.classic;
+	return {
+		toolbox: buildToolbox(presets, displayOptions()),
+		theme: isEffectivelyDark() ? themeSet.dark : themeSet.light,
+		// Classic uses Blockly's default renderer (Geras); Zelos is a renderer,
+		// not just a Theme. Changing it requires rebuilding the workspace.
+		renderer: selectedBlocklyTheme === "zelos" ? "zelos" : "geras",
+		trashcan: true,
+		zoom: { controls: true, wheel: true, pinch: true },
+		sounds: false,
+		move: { scrollbars: true, drag: true, wheel: true },
+	};
+}
+
+function injectWorkspace(serializedState = null) {
+	workspace = Blockly.inject(blocklyDiv, workspaceOptions());
+	workspace.addChangeListener(() => refreshBuild());
+	registerVerbPickerReactivity(workspace);
+	if (serializedState) Blockly.serialization.workspaces.load(serializedState, workspace);
+}
+
+function rebuildWorkspace() {
+	if (!workspace) return;
+	const serializedState = Blockly.serialization.workspaces.save(workspace);
+	workspace.dispose();
+	injectWorkspace(serializedState);
+	applyToolbox();
+	requestAnimationFrame(() => Blockly.svgResize(workspace));
+	refreshBuild();
 }
 
 function applyTheme(theme) {
@@ -338,8 +371,9 @@ function rerenderBreakdown() {
 
 async function runDeconstruct() {
 	const word = wordInput.value.trim();
-	if (!word) return;
 	if (deconstructAbort) deconstructAbort.abort();
+	const run = ++deconstructRun;
+	if (!word) return;
 	deconstructAbort = new AbortController();
 	breakdownDiv.innerHTML = "";
 	moveToBuilderBtn.hidden = true;
@@ -349,6 +383,10 @@ async function runDeconstruct() {
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
+		// AbortController is advisory: an upstream implementation may still
+		// resolve after abort. Never let that stale result replace a newer
+		// analysis (or one started before the user switched modes).
+		if (run !== deconstructRun) return;
 		if (!result.matches || result.matches.length === 0) {
 			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
 			return;
@@ -368,7 +406,7 @@ async function runDeconstruct() {
 		// lastDeconstructWord rather than the live input value).
 		syncURL({ push: true });
 	} catch (err) {
-		if (err?.name === "AbortError") return;
+		if (err?.name === "AbortError" || run !== deconstructRun) return;
 		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
 }
@@ -416,6 +454,14 @@ function applyToolbox() {
 }
 
 function setMode(next, { sync = true } = {}) {
+	// Invalidate any in-flight analysis before changing what is visible. This
+	// protects the Build view from a late Deconstruct response even when the
+	// API does not observe AbortController promptly.
+	deconstructRun++;
+	if (deconstructAbort) {
+		deconstructAbort.abort();
+		deconstructAbort = null;
+	}
 	mode = next;
 	modeBuildBtn.classList.toggle("active", next === "build");
 	modeBuildBtn.setAttribute("aria-selected", String(next === "build"));
@@ -466,26 +512,7 @@ async function main() {
 	defineVerbEndingPickerBlock(verbEndingIndex, presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
 	defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel);
 
-	workspace = Blockly.inject(blocklyDiv, {
-		toolbox: buildToolbox(presets, displayOptions()),
-		theme: isEffectivelyDark()
-			? blocklyThemes[selectedBlocklyTheme].dark
-			: blocklyThemes[selectedBlocklyTheme].light,
-		trashcan: true,
-		// pinch: true (bl-oq-ly#20) -- a touch pinch gesture zooms the
-		// workspace, same as the on-screen +/- controls/mouse wheel above.
-		// Without it, a phone-width viewport has no way to zoom the canvas at
-		// all: the toolbox tree + its flyout can together take up the whole
-		// visible width once a category is open (see style.css's own
-		// #blockly-div media-query comment), and pinch is the natural mobile
-		// gesture a learner reaches for to work around that -- Blockly
-		// doesn't enable it by default.
-		zoom: { controls: true, wheel: true, pinch: true },
-		sounds: false,
-		move: { scrollbars: true, drag: true, wheel: true },
-	});
-	workspace.addChangeListener(() => refreshBuild());
-	registerVerbPickerReactivity(workspace);
+	injectWorkspace();
 	window.addEventListener("resize", () => Blockly.svgResize(workspace));
 	window.addEventListener("orientationchange", () => Blockly.svgResize(workspace));
 
