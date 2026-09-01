@@ -4,7 +4,7 @@ import {
 	defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks,
 	buildVerbEndingIndex, defineVerbEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
 } from "./blocks.js";
-import { renderBreakdown } from "./breakdown.js";
+import { renderBreakdown, renderAlternativeBreakdowns } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
 import { composedTranslation } from "./gloss.js";
 import { readState, writeState } from "./router.js";
@@ -41,6 +41,7 @@ let blocklyThemes = null;
 let lastDeconstructWord = "";
 let lastDeconstructSeq = null;
 let lastDeconstructBuilt = null;
+let lastDeconstructAlternatives = null;
 
 // --- Display options (bl-oq-ly#10, #11, #17), persisted like the theme.
 // `displayOptions()` is the single source of truth passed into every
@@ -265,6 +266,12 @@ function rerenderBreakdown() {
 		reverseOrder: readLastFirst(),
 		lang: displayOptions().lang,
 	});
+	renderAlternativeBreakdowns(breakdownDiv, lastDeconstructAlternatives, glossSummaryItems, {
+		word: lastDeconstructWord,
+		reverseOrder: readLastFirst(),
+		lang: displayOptions().lang,
+		builderHref: (seq) => `${location.pathname}${writeState({ mode: "build", chain: seq.map((item) => item.id).filter(Boolean) })}`,
+	});
 }
 
 async function runDeconstruct() {
@@ -276,6 +283,7 @@ async function runDeconstruct() {
 	moveToBuilderBtn.hidden = true;
 	lastDeconstructIds = null;
 	lastDeconstructSeq = null;
+	lastDeconstructAlternatives = null;
 	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
@@ -283,11 +291,12 @@ async function runDeconstruct() {
 			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
 			return;
 		}
-		const best = result.matches[0];
-		const built = buildWord(best.seq);
+		const analyzed = result.matches.map((match) => ({ seq: match.seq, built: buildWord(match.seq) }));
+		const best = analyzed[0];
 		lastDeconstructWord = word;
 		lastDeconstructSeq = best.seq;
-		lastDeconstructBuilt = built;
+		lastDeconstructBuilt = best.built;
+		lastDeconstructAlternatives = analyzed.slice(1);
 		rerenderBreakdown();
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
 		moveToBuilderBtn.hidden = false;
@@ -369,6 +378,7 @@ function setMode(next, { sync = true } = {}) {
 		// when the state being restored actually carries a word.
 		lastDeconstructIds = null;
 		lastDeconstructSeq = null;
+		lastDeconstructAlternatives = null;
 		lastDeconstructWord = "";
 	}
 	// sync:false when applyShareState() is driving this (initial load or a

@@ -319,6 +319,20 @@ test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morp
 	for (const t of rowText) expect(t).not.toMatch(/[A-Z]_[A-Z]/);
 });
 
+test("Deconstruct: lower-ranked verified breakdowns are folded and link to their own builder chains", async ({ page }) => {
+	await page.click("#mode-deconstruct");
+	await page.fill("#word-input", "qimmeqarpunga");
+	await page.click("#analyze-btn");
+	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 20_000 });
+	await expect(page.locator("#status-line")).toHaveText("3 verified breakdown(s) found");
+	const alternatives = page.locator("#alternative-breakdowns");
+	await expect(alternatives).toBeVisible();
+	await expect(alternatives).not.toHaveAttribute("open", "");
+	await expect(alternatives.locator(".alternative-breakdown")).toHaveCount(2);
+	await expect(alternatives.locator(".breakdown-builder-link")).toHaveCount(2);
+	await expect(alternatives.locator(".breakdown-builder-link").first()).toHaveAttribute("href", /chain=/);
+});
+
 test("Deconstruct: reading-order toggle reverses the rows but never the composed translation (bl-oq-ly#11)", async ({ page }) => {
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");

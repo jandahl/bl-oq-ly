@@ -332,8 +332,9 @@ on every push and PR.
 - No persistence, no accounts, no saved workspaces.
 - One morpheme catalog (grammarian), fetched fresh on every load — no
   caching/offline support yet.
-- Deconstruct shows only the top-ranked verified breakdown, not the full
-  ranked list `analyzeWord()` can return.
+- Deconstruct foregrounds the top-ranked verified breakdown and keeps any
+  lower-ranked verified breakdowns folded below it, each with its own link
+  back to the Word Builder.
 - Not a substitute for oq's own Word Builder / Deconstruct views — this is a
   separate, more playful presentation of the same underlying engine, for
   exploring the idea of a block-based teaching tool.
