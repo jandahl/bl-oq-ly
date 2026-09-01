@@ -45,6 +45,35 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 });
 
+test("Deconstruct: examples cover noun, verb, affix, ending, enclitic, and transitive verb forms", async ({ page }) => {
+	const examples = page.locator("[data-example-word]");
+	await expect(examples).toHaveCount(6);
+	const classes = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleClass));
+	expect(classes).toEqual([
+		"noun",
+		"verb",
+		"derivational affix",
+		"inflectional ending",
+		"enclitic",
+		"transitive verb",
+	]);
+	const words = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleWord));
+	expect(new Set(words).size).toBe(words.length);
+});
+
+test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ page }) => {
+	await page.getByRole("button", { name: "Extended examples" }).click();
+	const modal = page.getByRole("dialog", { name: "oq CI worked examples" });
+	await expect(modal).toBeVisible();
+	await expect(modal.locator("#worked-examples-status")).toContainText("examples", { timeout: 20_000 });
+	await expect.poll(() => modal.locator("#worked-examples-list button").count(), { timeout: 20_000 }).toBeGreaterThan(400);
+	await modal.locator("#worked-examples-filter").fill("nerivugut");
+	await expect(modal.locator("#worked-examples-list button")).toHaveCount(1);
+	await expect(modal.locator("#worked-examples-list button")).toContainText("nerivugut");
+	await modal.locator("#worked-examples-close").click();
+	await expect(modal).toBeHidden();
+});
+
 async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText, dropX, dropY) {
 	const category = page.locator(".blocklyTreeLabel").filter({ hasText: categoryLabelText }).first();
 	await category.click({ force: true });

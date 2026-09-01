@@ -355,6 +355,39 @@ main {
 #example-words p { margin: 0.2rem 0 0.6rem; font-size: 0.85rem; }
 .example-word-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .example-word-list button { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+#worked-examples-btn {
+	margin-top: 0.7rem;
+	padding: 0.35rem 0.8rem;
+	border: 1px solid var(--accent);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--accent);
+	cursor: pointer;
+	font-size: 0.8rem;
+	font-weight: 600;
+	touch-action: manipulation;
+}
+
+dialog {
+	width: min(42rem, calc(100vw - 2rem));
+	max-height: min(42rem, calc(100vh - 2rem));
+	padding: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	color: var(--fg);
+	background: var(--panel-bg);
+	box-shadow: 0 1rem 4rem rgb(0 0 0 / 35%);
+}
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.modal-header h2 { margin: 0; font-size: 1.15rem; }
+.modal-header button { font-size: 1.4rem; line-height: 1; padding: 0.1rem 0.45rem; }
+.modal-description { margin: 0.4rem 0 0.8rem; font-size: 0.85rem; }
+.modal-filter { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+.modal-filter input { width: 100%; box-sizing: border-box; }
+.modal-status { margin: 0.65rem 0 0.4rem; font-size: 0.8rem; color: color-mix(in srgb, var(--fg) 65%, transparent); }
+.worked-examples-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.4rem; max-height: 25rem; overflow-y: auto; }
+.worked-examples-list button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 footer {
 	padding: 0.4rem 1rem 1rem;
