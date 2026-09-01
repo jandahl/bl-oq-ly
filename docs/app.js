@@ -23,6 +23,7 @@ const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterInput = document.getElementById("morpheme-filter");
 const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
+const exampleWordButtons = document.querySelectorAll("[data-example-word]");
 const showIdsCheckbox = document.getElementById("opt-show-ids");
 const readingOrderCheckbox = document.getElementById("opt-reading-order");
 const langSelect = document.getElementById("opt-lang");
@@ -418,6 +419,13 @@ async function main() {
 	modeBuildBtn.addEventListener("click", () => setMode("build"));
 	modeDeconstructBtn.addEventListener("click", () => setMode("deconstruct"));
 	analyzeBtn.addEventListener("click", runDeconstruct);
+	for (const button of exampleWordButtons) {
+		button.addEventListener("click", () => {
+			setMode("deconstruct");
+			wordInput.value = button.dataset.exampleWord;
+			runDeconstruct();
+		});
+	}
 	wordInput.addEventListener("keydown", (e) => {
 		if (e.key === "Enter") runDeconstruct();
 	});
