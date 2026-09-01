@@ -154,8 +154,40 @@ function initBlocklyTheme() {
 	blocklyThemeSelect.addEventListener("change", () => {
 		selectedBlocklyTheme = blocklyThemeSelect.value;
 		localStorage.setItem("bl-oq-ly:blockly-theme", selectedBlocklyTheme);
-		syncBlocklyTheme();
+		rebuildWorkspace();
 	});
+}
+
+function workspaceOptions() {
+	const themeSet = blocklyThemes[selectedBlocklyTheme] || blocklyThemes.classic;
+	return {
+		toolbox: buildToolbox(presets, displayOptions()),
+		theme: isEffectivelyDark() ? themeSet.dark : themeSet.light,
+		// Classic uses Blockly's default renderer (Geras); Zelos is a renderer,
+		// not just a Theme. Changing it requires rebuilding the workspace.
+		renderer: selectedBlocklyTheme === "zelos" ? "zelos" : "geras",
+		trashcan: true,
+		zoom: { controls: true, wheel: true, pinch: true },
+		sounds: false,
+		move: { scrollbars: true, drag: true, wheel: true },
+	};
+}
+
+function injectWorkspace(serializedState = null) {
+	workspace = Blockly.inject(blocklyDiv, workspaceOptions());
+	workspace.addChangeListener(() => refreshBuild());
+	registerVerbPickerReactivity(workspace);
+	if (serializedState) Blockly.serialization.workspaces.load(serializedState, workspace);
+}
+
+function rebuildWorkspace() {
+	if (!workspace) return;
+	const serializedState = Blockly.serialization.workspaces.save(workspace);
+	workspace.dispose();
+	injectWorkspace(serializedState);
+	applyToolbox();
+	requestAnimationFrame(() => Blockly.svgResize(workspace));
+	refreshBuild();
 }
 
 function applyTheme(theme) {
@@ -439,26 +471,7 @@ async function main() {
 	defineVerbEndingPickerBlock(verbEndingIndex, presetsById, displayOptions, resolveMoodLabel, resolvePersonLabel);
 	defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel);
 
-	workspace = Blockly.inject(blocklyDiv, {
-		toolbox: buildToolbox(presets, displayOptions()),
-		theme: isEffectivelyDark()
-			? blocklyThemes[selectedBlocklyTheme].dark
-			: blocklyThemes[selectedBlocklyTheme].light,
-		trashcan: true,
-		// pinch: true (bl-oq-ly#20) -- a touch pinch gesture zooms the
-		// workspace, same as the on-screen +/- controls/mouse wheel above.
-		// Without it, a phone-width viewport has no way to zoom the canvas at
-		// all: the toolbox tree + its flyout can together take up the whole
-		// visible width once a category is open (see style.css's own
-		// #blockly-div media-query comment), and pinch is the natural mobile
-		// gesture a learner reaches for to work around that -- Blockly
-		// doesn't enable it by default.
-		zoom: { controls: true, wheel: true, pinch: true },
-		sounds: false,
-		move: { scrollbars: true, drag: true, wheel: true },
-	});
-	workspace.addChangeListener(() => refreshBuild());
-	registerVerbPickerReactivity(workspace);
+	injectWorkspace();
 	window.addEventListener("resize", () => Blockly.svgResize(workspace));
 	window.addEventListener("orientationchange", () => Blockly.svgResize(workspace));
 
