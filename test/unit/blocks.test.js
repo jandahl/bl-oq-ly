@@ -94,11 +94,16 @@ test("buildToolbox: a real verb-mood ending (carrying inflection.subject) is exc
 	const toolbox = buildToolbox(presets, { showIds: false });
 	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
 	assert.ok(!category.contents.some((b) => b.data === "V_IND_INTR_1SG"));
-	// The category still exists, containing only the picker and its
-	// pluggable object-selector block (bl-oq-ly#20 follow-up).
-	assert.equal(category.contents.length, 2);
+	// The category still exists, containing only the composable picker and
+	// its mood/subject/object selector blocks.
+	assert.equal(category.contents.length, 4);
 	assert.equal(category.contents[0].type, "morpheme_block__verb_ending_picker");
-	assert.equal(category.contents[1].type, "morpheme_block__verb_object");
+	assert.equal(category.contents[0].inputs.MOOD_SLOT.shadow.type, "morpheme_block__verb_mood");
+	assert.equal(category.contents[0].inputs.SUBJECT_SLOT.shadow.type, "morpheme_block__verb_subject");
+	assert.equal(category.contents[1].type, "morpheme_block__verb_mood");
+	assert.equal(category.contents[2].type, "morpheme_block__verb_subject");
+	assert.equal(category.contents[3].type, "morpheme_block__verb_object");
+	assert.equal(category.categorystyle, "oq_inflectional_category");
 });
 
 test("chainFromTopBlock: walks a fake block stack via getNextBlock(), collecting each block's .data", () => {

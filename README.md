@@ -16,7 +16,7 @@ One page, two modes:
   Enclitics, ... — one category per grammarian `lexical_facts.morpheme_type`)
   and snap them into a single top-to-bottom stack, stem first. Each category
   is its own Blockly block *type* (`blocks.js`'s `morpheme_block__<category>`)
-  with that category's own fixed colour set in `init()` — not one shared
+  with that category's own oq word-class style set in `init()` — not one shared
   block type with a per-instance toolbox colour override, which Blockly
   silently ignores. Every block is a fixed, pre-labelled flyout entry (id +
   short gloss) — not a dropdown — so there's no giant `<select>` and no way
@@ -76,6 +76,10 @@ every toggle (and live on an OS-level change, while "Auto" is active). An
 earlier version forced Blockly's toolbox text to a fixed dark
 colour via a blanket CSS override — readable, but meant Blockly's own chrome
 could never actually go dark; this replaces that hack with real theming.
+Block and toolbox-category colors come from oq's public
+`WORD_CLASS_THEMES`/`getWordClassColors()` API: nominal, verbal,
+derivational, inflectional, and enclitic blocks therefore use the same
+canonical hierarchy palette as oq instead of locally invented hues.
 
 ### Display options
 
@@ -166,15 +170,18 @@ no reason connected to the content being shared. They stay in
 (one per real mood × transitivity × subject × object combination — a flat
 scroll no learner should have to search) with a single conjugation-style
 picker block at the top of the category (bl-oq-ly#18). Two plain Blockly
-`FieldDropdown`s — mood, subject — resolve live to a real morpheme id,
-shown on the block itself (`buildWord`'s own spelling + gloss); a "variant"
+value blocks — mood and subject — plug into typed sockets and resolve live
+to a real morpheme id shown on the parent (`buildWord`'s own spelling +
+gloss). The toolbox parent includes both as replaceable shadow defaults, so
+it works immediately when dragged while still making its grammar visible.
+Each selector is also listed separately for easy replacement. A "variant"
 dropdown appears only for the ~23 real endings that share identical
 paradigm coordinates (e.g. plain vs. negative contemporative), letting the
 learner choose between them. `docs/verb-endings.js` builds the paradigm
 index from grammarian's own catalog and looks up candidates by coordinate;
 `docs/blocks.js` owns the block/field wiring.
 
-The object isn't a third dropdown: it's a real, sideways puzzle-piece value
+The object is the third typed puzzle-piece value
 socket (`OBJECT_SLOT`), dangling and optional the same way a math block's
 own operand socket can sit empty (bl-oq-ly#20 follow-up). Plugging a small
 object-selector block (its own "I"/"you"/"he, she, it"/... dropdown,
@@ -192,7 +199,7 @@ workspace-level change listener (wired up once, right after
 whenever a relevant Blockly event fires, however the event happens — real
 drag, or programmatic `.connect()`/`.setFieldValue()` alike.
 
-Subject (and the object block's own combo) is a single combined
+Subject and object are each a single combined
 "I"/"you"/"he, she, it"/... choice (not separate person and number
 dropdowns) — the same pairing oq's own "conjugate to..." modal uses. Label
 text throughout (mood names, person/number wording) comes from oq's public
@@ -208,8 +215,8 @@ so those two stay plain, dependency-free and unit-testable under Node.
 
 A verb ending block placed on the canvas any other way -- Deconstruct's
 "Move to Word Builder," or restoring a shared `?chain=...` link -- is a real
-picker instance too, its fields set to match that exact id, a real object
-block plugged in and connected for a transitive ending, and the variant
+picker instance too, with real mood/subject blocks set to match that exact
+id, an object block connected for a transitive ending, and the variant
 dropdown set for one of the ~23 duplicate-coordinate ids -- not a frozen
 label with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s `renderChain()`
 builds these via `restoreVerbPickerFields()`.

@@ -15,7 +15,7 @@
 // (bl-oq-ly#1). One block type per category (not one shared type with a
 // per-instance toolbox colour override, which Blockly doesn't actually
 // apply — bl-oq-ly#6) gives every block its category's own colour reliably,
-// since Blockly always honours setColour() called from a block's own init().
+// since Blockly always honours setStyle() called from a block's own init().
 //
 // Directional connections (bl-oq-ly#11, corrected bl-oq-ly#15): encodes the
 // subset of oq's real join-legality engine (morphotactics.js's canFollow())
@@ -60,6 +60,8 @@ import { buildVerbEndingIndex, candidatesFor, parsePersonNumber, personNumberLab
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
+const VERB_MOOD_TYPE = `${BLOCK_TYPE_PREFIX}verb_mood`;
+const VERB_SUBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_subject`;
 const VERB_OBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_object`;
 // Value-connection check type for the picker's object socket -- distinct
 // from CONNECTION_TYPE (a previous/next STATEMENT connection every ordinary
@@ -67,24 +69,27 @@ const VERB_OBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_object`;
 // with no place in the linear stem-to-ending stack; a VERB_OBJECT_TYPE block
 // can only ever plug into a picker's OBJECT_SLOT input, never the main chain.
 const VERB_OBJECT_CONNECTION_TYPE = "VERB_OBJECT";
+const VERB_MOOD_CONNECTION_TYPE = "VERB_MOOD";
+const VERB_SUBJECT_CONNECTION_TYPE = "VERB_SUBJECT";
+const INFLECTION_BLOCK_STYLE = "oq_inflectional_blocks";
 
 // grammarian's lexical_facts.morpheme_type enum (verified against the live
 // published catalog — see README's "Morpheme catalog" note). Order here is
 // the toolbox category order, roughly composition order (stem first).
 // hasPrevious/hasNext default to true when omitted.
 const CATEGORY_ORDER = [
-	{ key: "stem", wordClass: "N", id: "stem_n", name: "Stems — nouns", colour: 200, hasPrevious: false },
-	{ key: "stem", wordClass: "V", id: "stem_v", name: "Stems — verbs", colour: 210, hasPrevious: false },
-	{ key: "stem", wordClass: "", id: "stem_other", name: "Stems — other", colour: 220, hasPrevious: false },
-	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colour: 20 },
-	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colour: 30 },
-	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colour: 130 },
-	{ key: "enclitic", id: "enclitic", name: "Enclitics", colour: 290, hasNext: false },
-	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colour: 300 },
-	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colour: 60 },
-	{ key: "particle", id: "particle", name: "Particles", colour: 0, hasPrevious: false, hasNext: false },
+	{ key: "stem", wordClass: "N", id: "stem_n", name: "Stems — nouns", colourClass: "oq_nominal", hasPrevious: false },
+	{ key: "stem", wordClass: "V", id: "stem_v", name: "Stems — verbs", colourClass: "oq_verbal", hasPrevious: false },
+	{ key: "stem", wordClass: "", id: "stem_other", name: "Stems — other", colourClass: "oq_neutral", hasPrevious: false },
+	{ key: "derivational_prefix", id: "deriv_prefix", name: "Derivational prefixes", colourClass: "oq_derivational" },
+	{ key: "derivational_affix", id: "deriv_affix", name: "Derivational affixes", colourClass: "oq_derivational" },
+	{ key: "inflectional_ending", id: "inflection", name: "Inflectional endings", colourClass: "oq_inflectional" },
+	{ key: "enclitic", id: "enclitic", name: "Enclitics", colourClass: "oq_enclitic", hasNext: false },
+	{ key: "derivational_enclitic", id: "deriv_enclitic", name: "Derivational enclitics", colourClass: "oq_enclitic" },
+	{ key: "sentential_affix", id: "sentential", name: "Sentential affixes", colourClass: "oq_inflectional" },
+	{ key: "particle", id: "particle", name: "Particles", colourClass: "oq_neutral", hasPrevious: false, hasNext: false },
 ];
-const FALLBACK_CATEGORY = { key: "other", id: "other", name: "Other", colour: 0 };
+const FALLBACK_CATEGORY = { key: "other", id: "other", name: "Other", colourClass: "oq_neutral" };
 
 function categoryForPreset(preset) {
 	const match = CATEGORY_ORDER.find((c) =>
@@ -159,7 +164,7 @@ export function defineMorphemeBlocks() {
 					.appendField(new Blockly.FieldLabelSerializable(""), "LABEL");
 				this.setPreviousStatement(cat.hasPrevious !== false, CONNECTION_TYPE);
 				this.setNextStatement(cat.hasNext !== false, CONNECTION_TYPE);
-				this.setColour(cat.colour);
+				this.setStyle(`${cat.colourClass}_blocks`);
 			},
 		};
 	}
@@ -173,20 +178,19 @@ function isMorphemeBlockType(type) {
 	// register as its own (empty) top-level "chain" in topLevelChains(),
 	// wrongly tripping refreshBuild()'s "more than one stack" error even
 	// though there's only one real stem-to-ending stack on the workspace.
-	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX) && type !== VERB_OBJECT_TYPE;
+	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX)
+		&& ![VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
 }
 
 // ---------------------------------------------------------------------------
 // Verb ending picker (bl-oq-ly#18, object-as-plug-in bl-oq-ly#20 follow-up)
 // — a conjugation-style block, the same paradigm shape as oq's own
 // conjugation modal, replacing a flat scroll through ~278 individual
-// mood-ending entries with two small dropdowns (mood, subject) plus a
-// sideways-pluggable, optional object socket. This is the standard Blockly
-// pattern for a categorical choice — the same `FieldDropdown` core Blockly's
-// own math_single block uses for "√ / abs / -x / ln / ..." — not a custom
-// field and not a mutator (mutators are for variable-ARITY structure like
-// if/elseif/else; a verb's mood/subject axes are a fixed small set, which is
-// exactly what plain dropdown fields are for).
+// mood-ending entries with three typed value sockets. Mood and subject are
+// required selector blocks (provided as replaceable shadow defaults in the
+// toolbox); object is optional. Each selector still uses Blockly's standard
+// FieldDropdown internally, but the parent now makes the grammatical parts
+// visible as composition rather than hiding them in a monolithic form.
 //
 // Transitivity is no longer its own dropdown: it's DERIVED from whether a
 // VERB_OBJECT_TYPE block is plugged into the picker's OBJECT_SLOT value
@@ -224,25 +228,23 @@ function verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePerson
 }
 
 /**
- * Recomputes which real morpheme id the picker's current field selections
- * (plus whatever's plugged into its OBJECT_SLOT) resolve to, and updates the
+ * Recomputes which real morpheme id the picker's connected selector blocks
+ * resolve to, and updates the
  * block's visible state (variant dropdown shown only when the combination is
  * ambiguous, RESOLVED label showing the real Kalaallisut spelling+gloss).
  *
- * `overrides` carries the field that's *in the middle of changing* -- called
- * from a field validator, which Blockly invokes with the prospective new
- * value BEFORE it's committed to the field itself, so `block.getFieldValue()`
- * for that one field would still read the OLD value if this didn't take an
- * explicit override for it. Every other field's value is already committed
- * and safe to read normally. There's no override for the object connection
- * itself -- registerVerbPickerReactivity() only calls this AFTER a connect/
- * disconnect or the connected block's own field change has already
- * committed, so `getInputTargetBlock` always reads the current state live.
+ * `variantOverride` carries the parent block's one remaining field while it
+ * is in the middle of changing. Mood, subject, and object are ordinary typed
+ * value blocks; the workspace listener observes them after their changes
+ * commit.
  */
-function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, overrides = {}) {
-	const fieldValue = (name) => overrides[name] ?? block.getFieldValue(name);
-	const mood = fieldValue("MOOD");
-	const { person: sPerson, number: sNumber } = parsePersonNumber(fieldValue("SUBJECT"));
+function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, variantOverride) {
+	const moodBlock = block.getInputTargetBlock("MOOD_SLOT");
+	const subjectBlock = block.getInputTargetBlock("SUBJECT_SLOT");
+	const mood = moodBlock?.getFieldValue("MOOD");
+	const { person: sPerson, number: sNumber } = subjectBlock
+		? parsePersonNumber(subjectBlock.getFieldValue("COMBO"))
+		: { person: undefined, number: undefined };
 
 	const objectBlock = block.getInputTargetBlock("OBJECT_SLOT");
 	const isTransitive = objectBlock != null;
@@ -251,7 +253,9 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 		? parsePersonNumber(objectBlock.getFieldValue("COMBO"))
 		: { person: undefined, number: undefined };
 
-	const candidates = candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber);
+	const candidates = mood && subjectBlock
+		? candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber)
+		: [];
 	const variantInput = block.getInput("VARIANT_GROUP");
 	const variantField = block.getField("VARIANT");
 
@@ -262,14 +266,13 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	} else if (candidates.length > 1) {
 		block.verbPickerState = { candidateOptions: candidates.map((c) => [c.label.slice(0, 70), c.id]) };
 		if (variantInput) variantInput.setVisible(true);
-		const currentValue = overrides.VARIANT ?? variantField?.getValue();
+		const currentValue = variantOverride ?? variantField?.getValue();
 		const stillValid = candidates.some((c) => c.id === currentValue);
 		resolvedId = stillValid ? currentValue : candidates[0].id;
 		// Only re-point the field at a new default when the *previous*
 		// combination's variant no longer applies -- never overwrite a
-		// value this exact call is already in the middle of committing
-		// (that's `overrides.VARIANT`, already valid by construction).
-		if (!stillValid && variantField && overrides.VARIANT === undefined) variantField.setValue(resolvedId);
+		// value this exact call is already in the middle of committing.
+		if (!stillValid && variantField && variantOverride === undefined) variantField.setValue(resolvedId);
 	} else {
 		if (variantInput) variantInput.setVisible(false);
 	}
@@ -278,7 +281,8 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	const resolvedField = block.getField("RESOLVED");
 	if (resolvedField) {
 		const preset = resolvedId ? presetsById.get(resolvedId) : null;
-		resolvedField.setValue(preset ? labelFor(preset, getDisplayOptions()) : "(no such ending in the catalog)");
+		const missing = !moodBlock ? "add a mood" : !subjectBlock ? "add a subject" : "no such ending in the catalog";
+		resolvedField.setValue(preset ? labelFor(preset, getDisplayOptions()) : `(${missing})`);
 	}
 	// init()'s own initial call runs before initSvg()/render() ever have --
 	// nothing to re-render yet at that point, and calling render() early
@@ -304,39 +308,45 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDisplayOptions, resolveMoodLabel, resolvePersonLabel) {
 	const { moodOptions, subjectOptions } = verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel);
 
-	// A field validator (not Block.setOnChange -- empirically unreliable for
-	// this in testing: it never fired at all for a plain workspace.newBlock()
-	// + setFieldValue() sequence, only a real user drag) is Blockly's
-	// standard, synchronously-guaranteed hook for "a field's value is about
-	// to change." Every dropdown but VARIANT shares this one: resolve with
-	// the field's own prospective new value as an override (see
-	// resolveVerbPicker's own comment on why), then accept it unchanged.
-	// The OBJECT_SLOT connection has no field of its own to validate --
-	// registerVerbPickerReactivity() covers that case instead.
-	function onFieldChange(fieldName) {
-		return function (newValue) {
-			const block = this.getSourceBlock();
-			if (block) resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, { [fieldName]: newValue });
-			return newValue;
-		};
+	function onVariantChange(newValue) {
+		const block = this.getSourceBlock();
+		if (block) resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, newValue);
+		return newValue;
 	}
+
+	Blockly.Blocks[VERB_MOOD_TYPE] = {
+		init() {
+			this.appendDummyInput()
+				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD");
+			this.setOutput(true, VERB_MOOD_CONNECTION_TYPE);
+			this.setStyle(INFLECTION_BLOCK_STYLE);
+			this.setInputsInline(true);
+			this.setTooltip("Verb mood");
+		},
+	};
+
+	Blockly.Blocks[VERB_SUBJECT_TYPE] = {
+		init() {
+			this.appendDummyInput()
+				.appendField(new Blockly.FieldDropdown(subjectOptions), "COMBO");
+			this.setOutput(true, VERB_SUBJECT_CONNECTION_TYPE);
+			this.setStyle(INFLECTION_BLOCK_STYLE);
+			this.setInputsInline(true);
+			this.setTooltip("Verb subject");
+		},
+	};
 
 	Blockly.Blocks[VERB_ENDING_PICKER_TYPE] = {
 		init() {
 			this.verbPickerState = { candidateOptions: [["—", "NONE"]] };
 
-			this.appendDummyInput()
-				.appendField("Verb ending:")
-				.appendField(new Blockly.FieldDropdown(moodOptions, onFieldChange("MOOD")), "MOOD");
-			this.appendDummyInput()
-				.appendField("subject")
-				.appendField(new Blockly.FieldDropdown(subjectOptions, onFieldChange("SUBJECT")), "SUBJECT");
-			// A real puzzle-piece value socket, not a dropdown: dangling/
-			// optional (intransitive) when empty, its own COMBO choice (see
-			// defineVerbObjectBlock) driving the conjugation once a
-			// VERB_OBJECT_TYPE block is plugged in (transitive). setCheck()
-			// keeps anything else from connecting here at all -- Blockly
-			// refuses the connection outright, never a runtime surprise.
+			this.appendDummyInput().appendField("Verb ending");
+			this.appendValueInput("MOOD_SLOT")
+				.setCheck(VERB_MOOD_CONNECTION_TYPE)
+				.appendField("mood");
+			this.appendValueInput("SUBJECT_SLOT")
+				.setCheck(VERB_SUBJECT_CONNECTION_TYPE)
+				.appendField("subject");
 			this.appendValueInput("OBJECT_SLOT")
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
 				.appendField("object (optional)");
@@ -352,17 +362,14 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 					// combination (and so a different variant list) selected
 					// at once.
 					return this.getSourceBlock()?.verbPickerState?.candidateOptions ?? [["—", "NONE"]];
-				}, onFieldChange("VARIANT")), "VARIANT");
+				}, onVariantChange), "VARIANT");
 			this.appendDummyInput()
 				.appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
 
 			this.setPreviousStatement(true, CONNECTION_TYPE);
 			this.setNextStatement(true, CONNECTION_TYPE);
-			this.setColour(130); // matches "Inflectional endings"' own category colour
+			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(false);
-			// Fields start on their first option, which needs an initial
-			// resolve too -- a validator only fires on a *change*, and the
-			// block's very first render never triggers one.
 			resolveVerbPicker(this, verbEndingIndex, presetsById, getDisplayOptions);
 		},
 	};
@@ -376,7 +383,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
  * value/output block, never part of the main stem-to-ending chain, whose
  * only purpose is plugging sideways into a verb ending picker's OBJECT_SLOT.
  * Its own COMBO dropdown is the same "I"/"you"/"he, she, it" choice the
- * picker's SUBJECT field uses, just for the object role.
+ * subject selector uses, just for the object role.
  * @param {ReturnType<typeof buildVerbEndingIndex>} verbEndingIndex
  * @param {(person: number, number: string) => string} resolvePersonLabel oq's public-api export.
  */
@@ -385,22 +392,20 @@ export function defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel) {
 	Blockly.Blocks[VERB_OBJECT_TYPE] = {
 		init() {
 			this.appendDummyInput()
-				.appendField("object:")
 				.appendField(new Blockly.FieldDropdown(objectOptions), "COMBO");
 			this.setOutput(true, VERB_OBJECT_CONNECTION_TYPE);
-			this.setColour(150); // a related but distinct shade from the picker's own 130
+			this.setStyle(INFLECTION_BLOCK_STYLE);
 			this.setInputsInline(true);
+			this.setTooltip("Verb object");
 		},
 	};
 }
 
 /**
- * Wires reactivity a field validator structurally can't reach: plugging or
- * unplugging a VERB_OBJECT_TYPE block into a picker's OBJECT_SLOT, and
- * editing that connected block's own COMBO dropdown, both need to
+ * Wires reactivity for plugging/unplugging any selector block and editing a
+ * connected selector's dropdown. All of those changes need to
  * re-resolve the OWNING picker -- not just whichever block's event actually
- * fired. MOOD/SUBJECT/VARIANT stay on field validators (see onFieldChange
- * above); this covers the connection/plugged-in-block case. One workspace-
+ * fired. VARIANT remains a field on the parent with its own validator. One workspace-
  * level listener, not one per block, since a picker block doesn't exist yet
  * (and the workspace doesn't either) at defineVerbEndingPickerBlock() time
  * -- app.js calls this once, right after Blockly.inject().
@@ -417,15 +422,22 @@ export function defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel) {
  * @param {ReturnType<typeof Blockly.inject>} workspace
  */
 export function registerVerbPickerReactivity(workspace) {
-	workspace.addChangeListener((event) => {
-		if (event.type !== Blockly.Events.BLOCK_MOVE && event.type !== Blockly.Events.BLOCK_CHANGE) return;
+	const resolveAll = () => {
 		for (const block of workspace.getAllBlocks(false)) {
 			if (block.type === VERB_ENDING_PICKER_TYPE) Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve(block);
 		}
+	};
+	workspace.addChangeListener((event) => {
+		if (event.type !== Blockly.Events.BLOCK_MOVE && event.type !== Blockly.Events.BLOCK_CHANGE) return;
+		resolveAll();
 	});
+	// Serialization loads with Blockly events suppressed. Resolve once when
+	// registering so a rebuilt workspace does not retain the picker's null
+	// init state despite having restored selector blocks connected already.
+	resolveAll();
 }
 
-export { VERB_ENDING_PICKER_TYPE, VERB_OBJECT_TYPE };
+export { VERB_ENDING_PICKER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE };
 
 /** True when `preset` is a real verb-mood inflectional ending -- one of the
  * ~278 entries carrying a structured `inflection.subject` (paradigm
@@ -437,15 +449,15 @@ function isVerbEndingPreset(preset) {
 	return preset.morpheme_type === "inflectional_ending" && Boolean(preset.seq?.[0]?.inflection?.subject);
 }
 
-/** "person|number" combo string in the same format the picker's SUBJECT/
- * OBJECT fields use (see verb-endings.js's personNumberKey/parsePersonNumber). */
+/** "person|number" combo string shared by subject/object selector fields
+ * (see verb-endings.js's personNumberKey/parsePersonNumber). */
 function comboKey(person, number) {
 	return `${person}|${number}`;
 }
 
 /**
- * Sets a freshly-created verb ending picker block's fields (and, for a
- * transitive ending, plugs in a matching object block) to match a specific
+ * Populates a freshly-created verb ending picker with matching mood and
+ * subject blocks (plus an object block for a transitive ending) for a specific
  * real morpheme id -- mood, subject, object, and (when `preset.id` is one
  * of the ~23 that share paradigm coordinates with another ending) the right
  * VARIANT -- so the block stays as adjustable as if it had been dragged
@@ -457,8 +469,17 @@ function comboKey(person, number) {
  */
 function restoreVerbPickerFields(workspace, block, preset) {
 	const inflection = preset.seq[0].inflection;
-	block.setFieldValue(inflection.mood, "MOOD");
-	block.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "SUBJECT");
+	const moodBlock = workspace.newBlock(VERB_MOOD_TYPE);
+	moodBlock.initSvg();
+	moodBlock.render();
+	moodBlock.setFieldValue(inflection.mood, "MOOD");
+	block.getInput("MOOD_SLOT").connection.connect(moodBlock.outputConnection);
+
+	const subjectBlock = workspace.newBlock(VERB_SUBJECT_TYPE);
+	subjectBlock.initSvg();
+	subjectBlock.render();
+	subjectBlock.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "COMBO");
+	block.getInput("SUBJECT_SLOT").connection.connect(subjectBlock.outputConnection);
 	if (inflection.object) {
 		const objectBlock = workspace.newBlock(VERB_OBJECT_TYPE);
 		objectBlock.initSvg();
@@ -466,11 +487,9 @@ function restoreVerbPickerFields(workspace, block, preset) {
 		objectBlock.setFieldValue(comboKey(inflection.object.person, inflection.object.number), "COMBO");
 		block.getInput("OBJECT_SLOT").connection.connect(objectBlock.outputConnection);
 	}
-	// The object connection above has no field validator of its own to
-	// trigger a resolve (see registerVerbPickerReactivity's own comment on
-	// why) -- force one explicitly rather than relying on event-listener
-	// timing, so the variant check just below reads an already-current
-	// block.data.
+	// Selector connections resolve through workspace events in normal use;
+	// force one synchronously while restoring so the variant check below sees
+	// the final coordinate immediately.
 	Blockly.Blocks[VERB_ENDING_PICKER_TYPE].__resolve(block);
 	// Only the paradigm coordinates above are guaranteed to already resolve
 	// to `preset.id` -- when they resolve to more than one candidate (a
@@ -536,16 +555,28 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 					fields: { LABEL: labelFor(preset, displayOptions) },
 				}));
 			if (name === "Inflectional endings" && includeVerbPicker) {
-				// Object goes second, right after the picker it plugs into --
-				// a learner filling in a picker's dangling OBJECT_SLOT finds
-				// its own selector block one drag away, not scattered
-				// somewhere further down the category.
-				blocks.unshift({ kind: "block", type: VERB_ENDING_PICKER_TYPE }, { kind: "block", type: VERB_OBJECT_TYPE });
+				// Mood and subject arrive as replaceable shadow defaults: dragging
+				// the parent from the palette yields a working ending immediately,
+				// while the three typed selector blocks directly below it make the
+				// composition model visible and easy to alter.
+				blocks.unshift(
+					{
+						kind: "block",
+						type: VERB_ENDING_PICKER_TYPE,
+						inputs: {
+							MOOD_SLOT: { shadow: { type: VERB_MOOD_TYPE } },
+							SUBJECT_SLOT: { shadow: { type: VERB_SUBJECT_TYPE } },
+						},
+					},
+					{ kind: "block", type: VERB_MOOD_TYPE },
+					{ kind: "block", type: VERB_SUBJECT_TYPE },
+					{ kind: "block", type: VERB_OBJECT_TYPE },
+				);
 			}
 			return {
 				kind: "category",
 				name: `${cat.name} (${blocks.length})`,
-				colour: String(cat.colour),
+				categorystyle: `${cat.colourClass}_category`,
 				contents: blocks,
 			};
 		});

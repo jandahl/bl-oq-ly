@@ -217,8 +217,8 @@ function workspaceOptions() {
 function injectWorkspace(serializedState = null) {
 	workspace = Blockly.inject(blocklyDiv, workspaceOptions());
 	workspace.addChangeListener(() => refreshBuild());
-	registerVerbPickerReactivity(workspace);
 	if (serializedState) Blockly.serialization.workspaces.load(serializedState, workspace);
+	registerVerbPickerReactivity(workspace);
 }
 
 function rebuildWorkspace() {

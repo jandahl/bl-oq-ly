@@ -26,6 +26,10 @@ test.beforeEach(async ({ page }) => {
 	// hostname here so a real regression isn't lost in known noise.
 	page.on("response", (response) => {
 		if (response.ok()) return;
+		// A reload can legitimately revalidate a cached local module. Playwright's
+		// response.ok() excludes 304 even though the browser uses its cached body
+		// successfully, so this is not a failed resource load.
+		if (response.status() === 304) return;
 		if (new URL(response.url()).hostname === "blockly-demo.appspot.com") return;
 		throw new Error(`Unexpected failed request: ${response.status()} ${response.url()}`);
 	});
@@ -111,6 +115,10 @@ test("Build: toolbox blocks are colour-coded per category, not a single shared c
 		return colour;
 	});
 	expect(stemColour).not.toEqual(affixColour);
+	// Exact light-theme values derived from oq's canonical nominal_root and
+	// derivational_affix HSL coordinates, converted to hex for Blockly 11.
+	expect(stemColour).toBe("#416ec8");
+	expect(affixColour).toBe("#c89b41");
 });
 
 test("Build: block labels always show the real Kalaallisut spelling, and hide grammarian's internal id by default (bl-oq-ly#10/#14)", async ({ page }) => {
@@ -130,28 +138,45 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 	expect(labelWithId).toContain("-qaq");
 });
 
-test("Build: verb ending picker resolves a real morpheme on init, updates live, and offers a variant for a duplicate-coordinate combination (bl-oq-ly#18)", async ({ page }) => {
+test("Build: verb ending composes typed mood/subject blocks and offers a variant for a duplicate-coordinate combination", async ({ page }) => {
 	const result = await page.evaluate(() => {
 		const ws = Blockly.getMainWorkspace();
 		const block = ws.newBlock("morpheme_block__verb_ending_picker");
 		block.initSvg();
 		block.render();
+		const incomplete = {
+			data: block.data,
+			resolved: block.getFieldValue("RESOLVED"),
+			hasOwnMoodField: block.getField("MOOD") !== null,
+		};
+		const mood = ws.newBlock("morpheme_block__verb_mood");
+		const subject = ws.newBlock("morpheme_block__verb_subject");
+		mood.initSvg(); mood.render();
+		subject.initSvg(); subject.render();
+		block.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
+		block.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
+		Blockly.Blocks[block.type].__resolve(block);
 		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), hasObject: block.getInputTargetBlock("OBJECT_SLOT") !== null };
 
-		block.setFieldValue("interrogative", "MOOD");
-		block.setFieldValue("3|sg", "SUBJECT");
+		mood.setFieldValue("interrogative", "MOOD");
+		subject.setFieldValue("3|sg", "COMBO");
+		Blockly.Blocks[block.type].__resolve(block);
 		const afterChange = { data: block.data, resolved: block.getFieldValue("RESOLVED") };
 
 		// contemporative/intransitive/1sg is a real duplicate-coordinate combo
 		// (plain vs. negative contemporative) -- see verb-endings.js's own comment.
-		block.setFieldValue("contemporative", "MOOD");
-		block.setFieldValue("1|sg", "SUBJECT");
+		mood.setFieldValue("contemporative", "MOOD");
+		subject.setFieldValue("1|sg", "COMBO");
+		Blockly.Blocks[block.type].__resolve(block);
 		const variant = { visible: block.getInput("VARIANT_GROUP").isVisible(), optionCount: block.verbPickerState.candidateOptions.length };
 
 		block.dispose(false);
-		return { initial, afterChange, variant };
+		return { incomplete, initial, afterChange, variant };
 	});
 
+	expect(result.incomplete.data).toBeNull();
+	expect(result.incomplete.resolved).toContain("add a mood");
+	expect(result.incomplete.hasOwnMoodField).toBe(false);
 	expect(result.initial.data).toBeTruthy();
 	expect(result.initial.resolved).not.toBe("");
 	expect(result.initial.hasObject).toBe(false); // nothing plugged into OBJECT_SLOT yet -- intransitive
@@ -159,6 +184,43 @@ test("Build: verb ending picker resolves a real morpheme on init, updates live, 
 	expect(result.afterChange.resolved).not.toContain("(no such ending"); // interrogative 3sg is a real form
 	expect(result.variant.visible).toBe(true);
 	expect(result.variant.optionCount).toBeGreaterThan(1);
+});
+
+test("Build: the palette's verb ending arrives with working, replaceable mood and subject shadow defaults", async ({ page }) => {
+	await dragFirstFlyoutBlockIntoWorkspace(page, "Inflectional endings", 420, 180);
+	const result = await page.evaluate(() => {
+		const block = Blockly.getMainWorkspace().getAllBlocks(false)
+			.find((candidate) => candidate.type === "morpheme_block__verb_ending_picker");
+		const mood = block?.getInputTargetBlock("MOOD_SLOT");
+		const subject = block?.getInputTargetBlock("SUBJECT_SLOT");
+		return block && {
+			data: block.data,
+			moodType: mood?.type,
+			moodIsShadow: mood?.isShadow(),
+			subjectType: subject?.type,
+			subjectIsShadow: subject?.isShadow(),
+		};
+	});
+	expect(result).toEqual({
+		data: "V_IND_INTR_1SG",
+		moodType: "morpheme_block__verb_mood",
+		moodIsShadow: true,
+		subjectType: "morpheme_block__verb_subject",
+		subjectIsShadow: true,
+	});
+
+	// Renderer changes rebuild the workspace through serialization; the
+	// composed ending and its defaults must survive that round-trip intact.
+	await page.selectOption("#blockly-theme-select", "zelos");
+	await expect.poll(() => page.evaluate(() => {
+		const block = Blockly.getMainWorkspace().getAllBlocks(false)
+			.find((candidate) => candidate.type === "morpheme_block__verb_ending_picker");
+		return block && {
+			data: block.data,
+			mood: block.getInputTargetBlock("MOOD_SLOT")?.getFieldValue("MOOD"),
+			subject: block.getInputTargetBlock("SUBJECT_SLOT")?.getFieldValue("COMBO"),
+		};
+	})).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", subject: "1|sg" });
 });
 
 test("Build: plugging a verb-object block into the picker's OBJECT_SLOT makes it transitive and drives the conjugation; unplugging reverts to intransitive (bl-oq-ly#20 follow-up)", async ({ page }) => {
@@ -174,6 +236,13 @@ test("Build: plugging a verb-object block into the picker's OBJECT_SLOT makes it
 		const picker = ws.newBlock("morpheme_block__verb_ending_picker");
 		picker.initSvg();
 		picker.render();
+		const mood = ws.newBlock("morpheme_block__verb_mood");
+		const subject = ws.newBlock("morpheme_block__verb_subject");
+		mood.initSvg(); mood.render();
+		subject.initSvg(); subject.render();
+		picker.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
+		picker.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
+		Blockly.Blocks[picker.type].__resolve(picker);
 		window.__picker = picker;
 		return { data: picker.data, resolved: picker.getFieldValue("RESOLVED") };
 	});
@@ -217,8 +286,15 @@ test("Build: verb ending picker, once connected into a chain, builds the real wo
 		const affix = ws.newBlock("morpheme_block__deriv_affix");
 		affix.data = "N_qaq_Vb";
 		affix.initSvg(); affix.render();
-		const ending = ws.newBlock("morpheme_block__verb_ending_picker"); // default resolves to V_IND_INTR_1SG
+		const ending = ws.newBlock("morpheme_block__verb_ending_picker");
 		ending.initSvg(); ending.render();
+		const mood = ws.newBlock("morpheme_block__verb_mood");
+		const subject = ws.newBlock("morpheme_block__verb_subject");
+		mood.initSvg(); mood.render();
+		subject.initSvg(); subject.render();
+		ending.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
+		ending.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
+		Blockly.Blocks[ending.type].__resolve(ending); // selector defaults resolve to V_IND_INTR_1SG
 		stem.nextConnection.connect(affix.previousConnection);
 		affix.nextConnection.connect(ending.previousConnection);
 	});
@@ -420,9 +496,16 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 	// dragging a fresh picker from the toolbox).
 	const endingBlock = await page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
-		return block && { data: block.data, mood: block.getFieldValue("MOOD"), moodOptionCount: block.getField("MOOD").getOptions().length };
+		const mood = block?.getInputTargetBlock("MOOD_SLOT");
+		const subject = block?.getInputTargetBlock("SUBJECT_SLOT");
+		return block && {
+			data: block.data,
+			mood: mood?.getFieldValue("MOOD"),
+			moodOptionCount: mood?.getField("MOOD").getOptions().length,
+			subject: subject?.getFieldValue("COMBO"),
+		};
 	});
-	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9 });
+	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9, subject: "1|sg" });
 });
 
 test("Build: a restored verb ending block (Move to Word Builder) stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
@@ -435,7 +518,8 @@ test("Build: a restored verb ending block (Move to Word Builder) stays live -- c
 
 	const afterChange = await page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
-		block.setFieldValue("optative", "MOOD");
+		block.getInputTargetBlock("MOOD_SLOT").setFieldValue("optative", "MOOD");
+		Blockly.Blocks[block.type].__resolve(block);
 		return { data: block.data, resolved: block.getFieldValue("RESOLVED") };
 	});
 	expect(afterChange.data).toBe("V_OPT_INTR_1SG");
