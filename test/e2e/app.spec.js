@@ -300,10 +300,12 @@ test("Build: theme toggle actually re-themes Blockly's own chrome, not just the 
 test("Build: Blockly theme dropdown switches to Zelos and persists the choice", async ({ page }) => {
 	await page.selectOption("#blockly-theme-select", "zelos");
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getRenderer().constructor.name)).toMatch(/zelos/i);
 	await page.reload();
 	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
 	await expect(page.locator("#blockly-theme-select")).toHaveValue("zelos");
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getRenderer().constructor.name)).toMatch(/zelos/i);
 });
 
 test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morpheme breakdown, not a raw id list (bl-oq-ly#4/#16)", async ({ page }) => {
