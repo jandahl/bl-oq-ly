@@ -45,7 +45,7 @@ test("Deconstruct: example words load into the analyzer", async ({ page }) => {
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 });
 
-test("Deconstruct: examples cover noun, verb, affix, ending, enclitic, and particle forms", async ({ page }) => {
+test("Deconstruct: examples cover noun, verb, affix, ending, enclitic, and transitive verb forms", async ({ page }) => {
 	const examples = page.locator("[data-example-word]");
 	await expect(examples).toHaveCount(6);
 	const classes = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleClass));
@@ -55,7 +55,7 @@ test("Deconstruct: examples cover noun, verb, affix, ending, enclitic, and parti
 		"derivational affix",
 		"inflectional ending",
 		"enclitic",
-		"particle",
+		"transitive verb",
 	]);
 	const words = await examples.evaluateAll((nodes) => nodes.map((node) => node.dataset.exampleWord));
 	expect(new Set(words).size).toBe(words.length);
