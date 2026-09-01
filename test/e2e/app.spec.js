@@ -211,7 +211,7 @@ test("Danish gloss language: block labels and Deconstruct's translation switch t
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 	const translation = await page.textContent(".breakdown-translation");
 	expect(translation.toLowerCase()).toContain("hund"); // Danish for "dog"
 });
@@ -310,7 +310,7 @@ test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morp
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 
 	await expect(page.locator(".breakdown-word")).toHaveText("qimmeqarpunga");
 	// The single most important regression this suite exists to prevent:
@@ -332,7 +332,6 @@ test("Deconstruct: lower-ranked verified breakdowns are folded and link to their
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 20_000 });
 	await expect(page.locator("#status")).toBeHidden();
 	const alternatives = page.locator("#alternative-breakdowns");
 	await expect(alternatives).toBeVisible();
@@ -346,7 +345,7 @@ test("Deconstruct: reading-order toggle reverses the rows but never the composed
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 
 	// "Read last morpheme first" defaults ON (index.html's #opt-reading-order
 	// starts checked), so the FIRST row on a fresh Deconstruct is already the
@@ -365,7 +364,7 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 	await page.click("#move-to-builder-btn");
 	await page.waitForTimeout(500);
 
@@ -399,7 +398,7 @@ test("Build: a restored verb ending block (Move to Word Builder) stays live -- c
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 	await page.click("#move-to-builder-btn");
 	await page.waitForTimeout(500);
 
@@ -474,7 +473,7 @@ test("Shareable links: a verified Deconstruct result pushes mode+word into the U
 	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
 	await expect.poll(() => page.evaluate(() => location.search)).toBe("?mode=deconstruct&word=qimmeqarpunga");
 
 	const shareUrl = await page.evaluate(() => location.href);
@@ -482,7 +481,7 @@ test("Shareable links: a verified Deconstruct result pushes mode+word into the U
 	await page2.goto(shareUrl);
 	await expect(page2.locator("#mode-deconstruct")).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
 	await expect(page2.locator("#word-input")).toHaveValue("qimmeqarpunga");
-	await expect(page2.locator("#status")).toHaveClass(/ok/, { timeout: 15_000 });
+	await expect(page2.locator("#status")).toBeHidden({ timeout: 15_000 });
 	await expect(page2.locator(".breakdown-translation")).toHaveText("I have a dog");
 	await page2.close();
 });
