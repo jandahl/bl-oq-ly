@@ -23,6 +23,7 @@ const OQ_STYLE_PATHS = {
 	oq_inflectional: ["inflectional_affix"],
 	oq_enclitic: ["enclitic"],
 	oq_neutral: [],
+	oq_container: [],
 };
 
 /** Blockly 12 rejects CSS hsl() strings, while oq's canonical API returns

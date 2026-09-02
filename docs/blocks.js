@@ -58,8 +58,10 @@
 import { buildVerbEndingIndex, candidatesFor, parsePersonNumber, personNumberLabel, moodDisplayLabel } from "./verb-endings.js";
 
 const CONNECTION_TYPE = "MORPHEME_CHAIN";
+const WORD_START_CONNECTION_TYPE = "WORD_START";
 const BLOCK_TYPE_PREFIX = "morpheme_block__";
 const VERB_ENDING_PICKER_TYPE = `${BLOCK_TYPE_PREFIX}verb_ending_picker`;
+const WORD_CONTAINER_TYPE = `${BLOCK_TYPE_PREFIX}word_container`;
 const VERB_MOOD_TYPE = `${BLOCK_TYPE_PREFIX}verb_mood`;
 const VERB_SUBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_subject`;
 const VERB_OBJECT_TYPE = `${BLOCK_TYPE_PREFIX}verb_object`;
@@ -196,12 +198,25 @@ export function presetMatchesQuery(preset, query) {
 
 /** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
 export function defineMorphemeBlocks() {
+	Blockly.Blocks[WORD_CONTAINER_TYPE] = {
+		init() {
+			this.appendStatementInput("MORPHEMES")
+				.setCheck(WORD_START_CONNECTION_TYPE)
+				.appendField("Word");
+			this.appendDummyInput("END")
+				.appendField("end word");
+			this.setStyle("oq_container_blocks");
+			this.setTooltip("A single word built from a chain of morphemes");
+		},
+	};
 	for (const cat of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) {
 		Blockly.Blocks[blockTypeForCategory(cat)] = {
 			init() {
 				this.appendDummyInput()
 					.appendField(new Blockly.FieldLabelSerializable(""), "LABEL");
-				this.setPreviousStatement(cat.hasPrevious !== false, CONNECTION_TYPE);
+				this.setPreviousStatement(
+					cat.hasPrevious === false ? WORD_START_CONNECTION_TYPE : CONNECTION_TYPE,
+				);
 				this.setNextStatement(cat.hasNext !== false, CONNECTION_TYPE);
 				this.setStyle(`${cat.colourClass}_blocks`);
 			},
@@ -218,7 +233,7 @@ function isMorphemeBlockType(type) {
 	// wrongly tripping refreshBuild()'s "more than one stack" error even
 	// though there's only one real stem-to-ending stack on the workspace.
 	return typeof type === "string" && type.startsWith(BLOCK_TYPE_PREFIX)
-		&& ![VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
+		&& ![WORD_CONTAINER_TYPE, VERB_MOOD_TYPE, VERB_SUBJECT_TYPE, VERB_OBJECT_TYPE].includes(type);
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +433,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
 				.appendField(`${UI_INDENT}Object (optional)`);
 			this.appendDummyInput("VARIANT_GROUP")
-				.appendField("variant")
+				.appendField(`${UI_INDENT}Variant`)
 				.appendField(new Blockly.FieldDropdown(function () {
 					// `this` is the FieldDropdown instance here (called as
 					// `this.menuGenerator_()` inside Blockly's own getOptions()),
@@ -624,11 +639,18 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 			};
 		});
 
+	contents.push({
+		kind: "category",
+		name: "Words (1)",
+		categorystyle: "oq_container_category",
+		contents: [{ kind: "block", type: WORD_CONTAINER_TYPE }],
+	});
 	return { kind: "categoryToolbox", contents };
 }
 
 /** Walks a stack of morpheme blocks starting at `block`, returning morpheme ids top to bottom. */
 export function chainFromTopBlock(block) {
+	if (block?.type === WORD_CONTAINER_TYPE) return chainFromTopBlock(block.getInputTargetBlock("MORPHEMES"));
 	const ids = [];
 	let cur = block;
 	while (cur) {
@@ -642,8 +664,9 @@ export function chainFromTopBlock(block) {
 export function topLevelChains(workspace) {
 	return workspace
 		.getTopBlocks(true)
-		.filter((b) => isMorphemeBlockType(b.type))
-		.map((b) => chainFromTopBlock(b));
+		.filter((b) => isMorphemeBlockType(b.type) || b.type === WORD_CONTAINER_TYPE)
+		.map((b) => chainFromTopBlock(b))
+		.filter((ids) => ids.length > 0);
 }
 
 /**
@@ -666,6 +689,10 @@ export function topLevelChains(workspace) {
  */
 export function renderChain(workspace, ids, presetsById, displayOptions) {
 	for (const block of workspace.getTopBlocks(false)) block.dispose(false);
+	const container = workspace.newBlock(WORD_CONTAINER_TYPE);
+	container.initSvg();
+	container.render();
+	container.moveBy(20, 20);
 	let prev = null;
 	for (const id of ids) {
 		const preset = presetsById.get(id);
@@ -682,7 +709,7 @@ export function renderChain(workspace, ids, presetsById, displayOptions) {
 		if (prev) {
 			prev.nextConnection.connect(block.previousConnection);
 		} else {
-			block.moveBy(20, 20);
+			container.getInput("MORPHEMES").connection.connect(block.previousConnection);
 		}
 		prev = block;
 	}
@@ -701,4 +728,4 @@ export function relabelBlocks(workspace, presetsById, displayOptions) {
 	}
 }
 
-export { buildVerbEndingIndex };
+export { buildVerbEndingIndex, WORD_CONTAINER_TYPE };
