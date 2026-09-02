@@ -18,15 +18,16 @@ One page, two modes:
   is its own Blockly block *type* (`blocks.js`'s `morpheme_block__<category>`)
   with that category's own oq word-class style set in `init()` — not one shared
   block type with a per-instance toolbox colour override, which Blockly
-  silently ignores. Every block is a fixed, pre-labelled flyout entry (id +
-  short gloss) — not a dropdown — so there's no giant `<select>` and no way
+  silently ignores. Every block is a fixed, pre-labelled flyout entry
+  (surface form + short gloss by default) — not a dropdown — so there's no giant `<select>` and no way
   to mistake an affix for a stem; only real morphemes of the right kind ever
   appear in a given category. Every change re-runs oq's real `buildWord()`
   pipeline (morphotactic grammar check → allomorphy → sandhi joins → display
   respelling) and shows the resulting surface form live, or the reason the
   stack doesn't yet form a legal word. A **filter box** above the palette
-  narrows the toolbox to matching id/gloss substrings live (a category with
-  no matches disappears entirely), and a **Hide/Show palette** button frees
+  narrows the toolbox by Kalaallisut surface form, alternate searchable form,
+  internal API id, or English/Danish gloss (a category with no matches
+  disappears entirely), and a **Hide/Show palette** button frees
   the full canvas width via Blockly's `Toolbox.setVisible()` — *not*
   `workspace.updateToolbox(null)`, which Blockly rejects once a workspace has
   been injected with a toolbox ("Can't nullify an existing toolbox").
@@ -105,15 +106,12 @@ Two checkboxes under the mode toggle, both persisted:
   top of the current one-directional connections, since that constraint (and
   `buildWord()`'s own stem-first requirement) would need solving properly
   first, not worked around per-toggle.
-- **"Show morpheme ids"** (default off). A block always shows the actual
-  Kalaallisut spelling (`preset.expected`, e.g. `qimmeq`, `-qaq`, `+voq`) —
-  that's real language, never hidden. This toggle only adds or removes
-  grammarian's own *internal* id (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) on top
-  of it, which happens to equal the spelling for a plain stem (its id *is*
-  its citation form) but is an opaque code for everything else — useful for
-  cross-referencing against grammarian's own data, off by default since it's
-  not what a learner needs to see. Toggling relabels every block already on
-  the canvas (`blocks.js`'s `relabelBlocks()`), not just future ones.
+- **"Add internal API ids"** (default off). Grammarian's opaque ids
+  (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) are optional diagnostics for
+  cross-referencing the source data. When enabled, an id follows the
+  learner-facing block label rather than displacing the surface form at its
+  start. Toggling relabels every block already on the canvas (`blocks.js`'s
+  `relabelBlocks()`), not just future ones.
 
 A mood-marking morpheme's gloss also bakes its own grammatical category
 (`moodLabel` — "statement", "question", ...) into the string with the same
@@ -131,10 +129,10 @@ Two further options, both persisted:
   {lang})`. Danish coverage isn't complete across every entry yet (a
   grammarian-side rollout in progress); a missing Danish gloss falls back to
   English rather than showing nothing.
-- **Spelling visibility** (`#opt-spelling`, both / spelling-only /
-  gloss-only). "Both" (default) shows the em-dash-joined `spelling — gloss`
-  every block has always shown. The other two let a learner test their own
-  recall in one direction by hiding half the label.
+- **Block labels** (`#opt-spelling`, surface form + gloss / surface form only /
+  gloss only). "Surface form + gloss" is the default and shows the
+  em-dash-joined `spelling — gloss`; the other two deliberately hide half the
+  label so a learner can test recall in either direction.
 
 ### Shareable links
 

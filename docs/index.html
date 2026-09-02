@@ -19,17 +19,17 @@
 		</div>
 		<div class="view-options">
 			<label><input type="checkbox" id="opt-reading-order" checked /> Read last morpheme first</label>
-			<label><input type="checkbox" id="opt-show-ids" /> Show morpheme ids</label>
+			<label><input type="checkbox" id="opt-show-ids" /> Add internal API ids</label>
 			<label>Gloss language
 				<select id="opt-lang">
 					<option value="en">English</option>
 					<option value="da">Dansk</option>
 				</select>
 			</label>
-			<label>Show
+			<label>Block labels
 				<select id="opt-spelling">
-					<option value="both">Kalaallisut + gloss</option>
-					<option value="spelling-only">Kalaallisut only</option>
+					<option value="both">Surface form + gloss</option>
+					<option value="spelling-only">Surface form only</option>
 					<option value="gloss-only">Gloss only</option>
 				</select>
 			</label>
@@ -41,7 +41,7 @@
 			<p class="hint">Drag morpheme blocks from the palette and snap them into a single stack, stem first. The result updates as you build.</p>
 			<div class="palette-controls">
 				<button id="palette-toggle" type="button">Hide palette</button>
-				<input id="morpheme-filter" type="text" placeholder="Filter morphemes by id or gloss…" autocomplete="off" spellcheck="false" />
+				<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
 				<label class="blockly-theme-control">Blockly theme
 					<select id="blockly-theme-select">
 						<option value="classic">Classic</option>

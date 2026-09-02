@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildToolbox, chainFromTopBlock } from "../../docs/blocks.js";
+import { buildToolbox, chainFromTopBlock, presetMatchesQuery } from "../../docs/blocks.js";
 
-// buildToolbox() and chainFromTopBlock() are the two blocks.js exports that
-// don't touch the `Blockly` global, so they're unit-testable directly under
+// These blocks.js exports don't touch the `Blockly` global, so they're
+// unit-testable directly under
 // Node — everything else (defineMorphemeBlocks, renderChain, relabelBlocks,
 // the actual connection-check behaviour) needs a real Blockly runtime and is
 // covered by test/e2e/ instead.
@@ -62,7 +62,7 @@ test("buildToolbox: showIds=false shows only the real Kalaallisut spelling + glo
 	assert.ok(!label.includes("statement"), "mood label must be dropped from the block label entirely, not just hidden");
 });
 
-test("buildToolbox: showIds=true adds the internal id in front, without losing the spelling", () => {
+test("buildToolbox: showIds=true adds the internal id after the learner-facing spelling", () => {
 	const presets = [preset({
 		id: "V_IND_INTR_1SG",
 		expected: "-vunga",
@@ -74,7 +74,30 @@ test("buildToolbox: showIds=true adds the internal id in front, without losing t
 	const toolbox = buildToolbox(presets, { showIds: true });
 	const category = toolbox.contents.find((c) => c.name.startsWith("Inflectional endings"));
 	const entry = category.contents.find((b) => b.data === "V_IND_INTR_1SG");
-	assert.equal(entry.fields.LABEL, "V_IND_INTR_1SG — -vunga — I");
+	assert.equal(entry.fields.LABEL, "-vunga — I — V_IND_INTR_1SG");
+});
+
+test("buildToolbox: a long gloss cannot truncate away either the surface form or requested API id", () => {
+	const presets = [preset({ id: "V_ngngit_Vb", expected: "-nngit", glossShort: "a deliberately very long explanation of ordinary verbal negation", morpheme_type: "sentential_affix" })];
+	const toolbox = buildToolbox(presets, { showIds: true });
+	const category = toolbox.contents.find((candidate) => candidate.name.startsWith("Sentential affixes"));
+	const label = category.contents[0].fields.LABEL;
+	assert.ok(label.startsWith("-nngit"));
+	assert.ok(label.endsWith("V_ngngit_Vb"));
+	assert.ok(label.length <= 60);
+});
+
+test("presetMatchesQuery: finds the ordinary negator by its real -nngit form despite its V_ngngit_Vb API id", () => {
+	const negator = preset({
+		id: "V_ngngit_Vb",
+		expected: "-nngit",
+		searchForms: ["-nngilaq"],
+		glossShort: "negation, ___ not",
+	});
+	assert.equal(presetMatchesQuery(negator, "nngit"), true);
+	assert.equal(presetMatchesQuery(negator, "nngilaq"), true);
+	assert.equal(presetMatchesQuery(negator, "negation"), true);
+	assert.equal(presetMatchesQuery(negator, "not present"), false);
 });
 
 test("buildToolbox: a stem's label uses its own id as the spelling (regression guard: this is why hiding ids used to also hide stem spellings by accident)", () => {

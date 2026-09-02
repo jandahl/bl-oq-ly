@@ -151,8 +151,45 @@ export function labelFor(preset, opts = {}) {
 	const core = spellingMode === "spelling-only" ? spelling
 		: spellingMode === "gloss-only" ? gloss
 			: `${spelling} — ${gloss}`;
-	const label = showIds ? `${preset.id} — ${core}` : core;
-	return label.slice(0, 60);
+	// The surface form is the useful identity of a morpheme, so keep the
+	// learner-facing content first. Internal API ids are optional diagnostics
+	// and belong at the end; putting them first lets Blockly's compact-label
+	// truncation hide the actual Kalaallisut form behind an opaque code.
+	const maxLength = 60;
+	if (!showIds) return core.slice(0, maxLength);
+	const suffix = ` — ${preset.id}`;
+	const available = maxLength - suffix.length;
+	if (available <= 1) return `${spelling}${suffix}`.slice(0, maxLength);
+	const visibleCore = core.length > available ? `${core.slice(0, available - 1)}…` : core;
+	return `${visibleCore}${suffix}`;
+}
+
+/**
+ * Whether a catalog preset matches the Build-palette query. Search the same
+ * learner-facing surface data the block can display, not only oq's internal
+ * id and English gloss. In particular, the ordinary negator is spelled
+ * `-nngit` but has the API id `V_ngngit_Vb`; an id-only search silently hid
+ * the exact morpheme a learner typed.
+ *
+ * @param {any} preset
+ * @param {string} query
+ */
+export function presetMatchesQuery(preset, query) {
+	const q = String(query ?? "").trim().toLowerCase();
+	if (!q) return true;
+	const plainGloss = preset?.plainGloss ?? {};
+	const searchable = [
+		preset?.id,
+		preset?.expected,
+		...(Array.isArray(preset?.searchForms) ? preset.searchForms : []),
+		preset?.glossShort,
+		preset?.gloss,
+		plainStringGloss(plainGloss.en_short),
+		plainGloss.en,
+		plainStringGloss(plainGloss.da_short),
+		plainGloss.da,
+	];
+	return searchable.some((value) => typeof value === "string" && value.toLowerCase().includes(q));
 }
 
 /** Registers one Blockly block type per category, each with that category's own colour and connection shape. */
