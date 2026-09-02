@@ -19,7 +19,7 @@ One page, two modes:
   with that category's own oq word-class style set in `init()` — not one shared
   block type with a per-instance toolbox colour override, which Blockly
   silently ignores. Every block is a fixed, pre-labelled flyout entry
-  (surface form + short gloss by default) — not a dropdown — so there's no giant `<select>` and no way
+  (morpheme + short gloss by default) — not a dropdown — so there's no giant `<select>` and no way
   to mistake an affix for a stem; only real morphemes of the right kind ever
   appear in a given category. Every change re-runs oq's real `buildWord()`
   pipeline (morphotactic grammar check → allomorphy → sandhi joins → display
@@ -84,7 +84,7 @@ canonical hierarchy palette as oq instead of locally invented hues.
 
 ### Display options
 
-Two checkboxes under the mode toggle, both persisted:
+The display controls under the mode toggle are persisted:
 
 - **"Read last morpheme first"** (default on). Reverses Deconstruct's
   per-morpheme rows so a European reader's own translation direction reads
@@ -106,11 +106,17 @@ Two checkboxes under the mode toggle, both persisted:
   top of the current one-directional connections, since that constraint (and
   `buildWord()`'s own stem-first requirement) would need solving properly
   first, not worked around per-toggle.
+- **Morpheme display** (`#opt-spelling`, show before gloss / show without
+  gloss / hide). "Show before gloss" is the default and prepends the
+  catalog's morpheme form to its explanation: `-nngit — negation, ___ not`.
+  The other modes support recall practice by showing the morpheme alone or
+  hiding it in favour of the gloss. This is the learner-facing identity of a
+  block and is deliberately distinct from its internal API id.
 - **"Add internal API ids"** (default off). Grammarian's opaque ids
   (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) are optional diagnostics for
-  cross-referencing the source data. When enabled, an id follows the
-  learner-facing block label rather than displacing the surface form at its
-  start. Toggling relabels every block already on the canvas (`blocks.js`'s
+  cross-referencing the source data. When enabled, an id follows the entire
+  learner-facing block label; it never occupies the morpheme's leading
+  position. Toggling relabels every block already on the canvas (`blocks.js`'s
   `relabelBlocks()`), not just future ones.
 
 A mood-marking morpheme's gloss also bakes its own grammatical category
@@ -121,7 +127,7 @@ its own small tag (`+voq` → *(statement)* `he/she/it`); a Build block drops
 it entirely instead — there's no room for a second annotation on an
 already-compact block label there.
 
-Two further options, both persisted:
+Gloss language is persisted as well:
 
 - **Language** (`#opt-lang`, English/Dansk). Selects which of grammarian's
   own `plain_gloss.en`/`da` (and `en_short`/`da_short`) fields block labels
@@ -129,10 +135,6 @@ Two further options, both persisted:
   {lang})`. Danish coverage isn't complete across every entry yet (a
   grammarian-side rollout in progress); a missing Danish gloss falls back to
   English rather than showing nothing.
-- **Block labels** (`#opt-spelling`, surface form + gloss / surface form only /
-  gloss only). "Surface form + gloss" is the default and shows the
-  em-dash-joined `spelling — gloss`; the other two deliberately hide half the
-  label so a learner can test recall in either direction.
 
 ### Shareable links
 
