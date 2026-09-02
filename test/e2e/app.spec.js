@@ -139,6 +139,16 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 	expect(labelWithId.indexOf("-qaq")).toBeLessThan(labelWithId.indexOf("N_qaq_Vb"));
 });
 
+test("Build: the morpheme display option explicitly prepends the morpheme to its gloss", async ({ page }) => {
+	const options = await page.locator("#opt-spelling option").allTextContents();
+	expect(options).toEqual(["Show before gloss", "Show without gloss", "Hide (gloss only)"]);
+
+	await page.fill("#morpheme-filter", "nngit");
+	await page.locator(".blocklyTreeLabel", { hasText: "Sentential affixes" }).click({ force: true });
+	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ }).textContent();
+	expect(label.indexOf("-nngit")).toBe(0);
+});
+
 test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisut form", async ({ page }) => {
 	await page.fill("#morpheme-filter", "nngit");
 	const sententialCategory = page.locator(".blocklyTreeLabel", { hasText: "Sentential affixes" });

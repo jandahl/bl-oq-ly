@@ -151,10 +151,11 @@ export function labelFor(preset, opts = {}) {
 	const core = spellingMode === "spelling-only" ? spelling
 		: spellingMode === "gloss-only" ? gloss
 			: `${spelling} — ${gloss}`;
-	// The surface form is the useful identity of a morpheme, so keep the
-	// learner-facing content first. Internal API ids are optional diagnostics
-	// and belong at the end; putting them first lets Blockly's compact-label
-	// truncation hide the actual Kalaallisut form behind an opaque code.
+	// The morpheme is the useful learner-facing identity, so keep its form at
+	// the start of the label whenever spellingMode includes it. Internal API
+	// ids are optional diagnostics and belong at the end; putting them first
+	// lets Blockly's compact-label truncation hide the actual Kalaallisut form
+	// behind an opaque code.
 	const maxLength = 60;
 	if (!showIds) return core.slice(0, maxLength);
 	const suffix = ` — ${preset.id}`;
