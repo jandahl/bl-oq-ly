@@ -31,6 +31,9 @@ const nodeGlobals = {
 
 export default [
 	{
+		ignores: ["docs/vendor/**"],
+	},
+	{
 		files: ["docs/**/*.js"],
 		languageOptions: {
 			ecmaVersion: "latest",
