@@ -3,6 +3,7 @@ import { loadCatalog } from "./catalog.js";
 import {
 	defineMorphemeBlocks, buildToolbox, topLevelChains, renderChain, relabelBlocks,
 	buildVerbEndingIndex, defineVerbEndingPickerBlock, defineVerbObjectBlock, registerVerbPickerReactivity,
+	presetMatchesQuery,
 } from "./blocks.js";
 import { renderBreakdown, renderAlternativeBreakdowns } from "./breakdown.js";
 import { buildBlocklyThemes } from "./theme.js";
@@ -441,7 +442,7 @@ function applyToolbox() {
 
 	const q = filterInput.value.trim().toLowerCase();
 	const filtered = q
-		? presets.filter((p) => p.id.toLowerCase().includes(q) || (p.glossShort || p.gloss || "").toLowerCase().includes(q))
+		? presets.filter((preset) => presetMatchesQuery(preset, q))
 		: presets;
 	// Rebuilt every time from scratch (no cached "full" toolbox), since
 	// display options can change independently of the filter and both need

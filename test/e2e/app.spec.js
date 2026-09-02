@@ -136,6 +136,15 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 	const labelWithId = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(labelWithId).toContain("N_qaq_Vb");
 	expect(labelWithId).toContain("-qaq");
+	expect(labelWithId.indexOf("-qaq")).toBeLessThan(labelWithId.indexOf("N_qaq_Vb"));
+});
+
+test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisut form", async ({ page }) => {
+	await page.fill("#morpheme-filter", "nngit");
+	const sententialCategory = page.locator(".blocklyTreeLabel", { hasText: "Sentential affixes" });
+	await expect(sententialCategory).toBeVisible();
+	await sententialCategory.click({ force: true });
+	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ })).toBeVisible();
 });
 
 test("Build: verb ending composes typed mood/subject blocks and offers a variant for a duplicate-coordinate combination", async ({ page }) => {
