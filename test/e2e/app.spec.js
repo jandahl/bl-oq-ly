@@ -347,7 +347,7 @@ test("Spelling-visibility mode: gloss-only and spelling-only each show exactly w
 	expect(spellingOnlyLabel).not.toContain(" — ");
 });
 
-test("Build: directional connections — a stem can't be preceded, a word-final ending can take an enclitic, a particle is fully standalone (bl-oq-ly#11/#15)", async ({ page }) => {
+test("Build: directional connections — word starts accept only a container, endings can take an enclitic, and particles remain standalone (bl-oq-ly#11/#15)", async ({ page }) => {
 	const result = await page.evaluate(() => {
 		const ws = Blockly.getMainWorkspace();
 		const mk = (type) => { const b = ws.newBlock(type); b.initSvg(); b.render(); return b; };
@@ -368,11 +368,11 @@ test("Build: directional connections — a stem can't be preceded, a word-final 
 		for (const b of [stem, ending, enclitic, particle]) b.dispose(false);
 		return out;
 	});
-	expect(result.stemHasPrevious).toBe(false);
+	expect(result.stemHasPrevious).toBe(true);
 	expect(result.endingHasNext).toBe(true);
 	expect(result.endingToEncliticTypeChecks).toBe(true);
 	expect(result.encliticHasNext).toBe(false);
-	expect(result.particleHasPrevious).toBe(false);
+	expect(result.particleHasPrevious).toBe(true);
 	expect(result.particleHasNext).toBe(false);
 });
 
@@ -398,7 +398,7 @@ test("Build: filter narrows the toolbox and closes any already-open flyout (bl-o
 	// would pass even while stale content sits there invisibly -- what
 	// actually matters is that no flyout block is actually visible.
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable:visible")).toHaveCount(0);
-	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/]);
+	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/, /Words \(1\)/]);
 });
 
 test("Build: theme toggle actually re-themes Blockly's own chrome, not just the page (bl-oq-ly#7)", async ({ page }) => {
@@ -490,6 +490,7 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 		const ws = Blockly.getMainWorkspace();
 		const tops = ws.getTopBlocks(true);
 		return tops.map((top) => {
+			if (top.type === "morpheme_block__word_container") top = top.getInputTargetBlock("MORPHEMES");
 			const ids = [];
 			let cur = top;
 			while (cur) { ids.push(cur.data); cur = cur.getNextBlock(); }
