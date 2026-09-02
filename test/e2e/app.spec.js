@@ -79,7 +79,7 @@ test("Deconstruct: oq CI worked examples open in a filterable modal", async ({ p
 });
 
 async function dragFirstFlyoutBlockIntoWorkspace(page, categoryLabelText, dropX, dropY) {
-	const category = page.locator(".blocklyTreeLabel").filter({ hasText: categoryLabelText }).first();
+	const category = page.locator('[role="treeitem"]').filter({ hasText: categoryLabelText }).first();
 	await category.click({ force: true });
 	await page.waitForTimeout(400);
 	const block = page.locator(".blocklyFlyout .blocklyDraggable").first();
@@ -116,14 +116,14 @@ test("Build: toolbox blocks are colour-coded per category, not a single shared c
 	});
 	expect(stemColour).not.toEqual(affixColour);
 	// Exact light-theme values derived from oq's canonical nominal_root and
-	// derivational_affix HSL coordinates, converted to hex for Blockly 11.
+	// derivational_affix HSL coordinates, converted to hex for Blockly 12.
 	expect(stemColour).toBe("#416ec8");
 	expect(affixColour).toBe("#c89b41");
 });
 
 test("Build: block labels always show the real Kalaallisut spelling, and hide grammarian's internal id by default (bl-oq-ly#10/#14)", async ({ page }) => {
 	await page.fill("#morpheme-filter", "N_qaq_Vb");
-	await page.locator(".blocklyTreeLabel").first().click({ force: true });
+	await page.locator('[role="treeitem"]').first().click({ force: true });
 	await page.waitForTimeout(400);
 	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(label).toContain("-qaq");
@@ -131,7 +131,7 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 
 	await page.click("#opt-show-ids");
 	await page.waitForTimeout(400);
-	await page.locator(".blocklyTreeLabel").first().click({ force: true });
+	await page.locator('[role="treeitem"]').first().click({ force: true });
 	await page.waitForTimeout(400);
 	const labelWithId = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(labelWithId).toContain("N_qaq_Vb");
@@ -144,14 +144,14 @@ test("Build: the morpheme display option explicitly prepends the morpheme to its
 	expect(options).toEqual(["Show before gloss", "Show without gloss", "Hide (gloss only)"]);
 
 	await page.fill("#morpheme-filter", "nngit");
-	await page.locator(".blocklyTreeLabel", { hasText: "Sentential affixes" }).click({ force: true });
+	await page.locator('[role="treeitem"]', { hasText: "Sentential affixes" }).click({ force: true });
 	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ }).textContent();
 	expect(label.indexOf("-nngit")).toBe(0);
 });
 
 test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisut form", async ({ page }) => {
 	await page.fill("#morpheme-filter", "nngit");
-	const sententialCategory = page.locator(".blocklyTreeLabel", { hasText: "Sentential affixes" });
+	const sententialCategory = page.locator('[role="treeitem"]', { hasText: "Sentential affixes" });
 	await expect(sententialCategory).toBeVisible();
 	await sententialCategory.click({ force: true });
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ })).toBeVisible();
@@ -325,7 +325,7 @@ test("Build: verb ending picker, once connected into a chain, builds the real wo
 test("Build: filtering the palette hides the verb ending picker entirely (bl-oq-ly#18: it has no id/gloss text to match a query)", async ({ page }) => {
 	await page.fill("#morpheme-filter", "qimme");
 	await page.waitForTimeout(400);
-	const names = await page.locator(".blocklyTreeLabel").allTextContents();
+	const names = await page.locator('[role="treeitem"]').allTextContents();
 	expect(names.some((n) => n.startsWith("Inflectional endings"))).toBe(false);
 });
 
@@ -341,7 +341,7 @@ test("Danish gloss language: block labels and Deconstruct's translation switch t
 });
 
 test("Spelling-visibility mode: gloss-only and spelling-only each show exactly what they promise (bl-oq-ly#17)", async ({ page }) => {
-	const stemCat = page.locator(".blocklyTreeLabel").filter({ hasText: "Stems — nouns" }).first();
+	const stemCat = page.locator('[role="treeitem"]').filter({ hasText: "Stems — nouns" }).first();
 
 	await page.selectOption("#opt-spelling", "gloss-only");
 	await stemCat.click({ force: true });
@@ -386,17 +386,17 @@ test("Build: directional connections — a stem can't be preceded, a word-final 
 });
 
 test("Build: palette Hide/Show actually hides the toolbox, and never throws (bl-oq-ly#9: updateToolbox(null) throws — must use Toolbox.setVisible())", async ({ page }) => {
-	await expect(page.locator(".blocklyToolboxDiv")).toBeVisible();
+	await expect(page.locator(".blocklyToolbox")).toBeVisible();
 	await page.click("#palette-toggle");
 	await page.waitForTimeout(300);
-	await expect(page.locator(".blocklyToolboxDiv")).toBeHidden();
+	await expect(page.locator(".blocklyToolbox")).toBeHidden();
 	await page.click("#palette-toggle");
 	await page.waitForTimeout(300);
-	await expect(page.locator(".blocklyToolboxDiv")).toBeVisible();
+	await expect(page.locator(".blocklyToolbox")).toBeVisible();
 });
 
 test("Build: filter narrows the toolbox and closes any already-open flyout (bl-oq-ly#9: a stale flyout used to keep showing unfiltered content)", async ({ page }) => {
-	await page.locator(".blocklyTreeLabel").filter({ hasText: "Derivational affixes" }).first().click({ force: true });
+	await page.locator('[role="treeitem"]').filter({ hasText: "Derivational affixes" }).first().click({ force: true });
 	await page.waitForTimeout(400);
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable").first()).toBeVisible();
 	await page.fill("#morpheme-filter", "qimme");
@@ -407,7 +407,7 @@ test("Build: filter narrows the toolbox and closes any already-open flyout (bl-o
 	// would pass even while stale content sits there invisibly -- what
 	// actually matters is that no flyout block is actually visible.
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable:visible")).toHaveCount(0);
-	await expect(page.locator(".blocklyTreeLabel")).toHaveText([/Stems — nouns \(1\)/]);
+	await expect(page.locator('[role="treeitem"]')).toHaveText([/Stems — nouns \(1\)/]);
 });
 
 test("Build: theme toggle actually re-themes Blockly's own chrome, not just the page (bl-oq-ly#7)", async ({ page }) => {
@@ -634,7 +634,7 @@ test("Build: on a phone-width viewport, the toolbox tree stays a minority of the
 	await page.waitForTimeout(200);
 	const { blocklyDivWidth, toolboxDivWidth } = await page.evaluate(() => ({
 		blocklyDivWidth: document.querySelector("#blockly-div").getBoundingClientRect().width,
-		toolboxDivWidth: document.querySelector(".blocklyToolboxDiv").getBoundingClientRect().width,
+		toolboxDivWidth: document.querySelector(".blocklyToolbox").getBoundingClientRect().width,
 	}));
 	expect(toolboxDivWidth / blocklyDivWidth).toBeLessThan(0.5);
 });

@@ -213,15 +213,19 @@ main {
    comment above -- CSS is the only lever Blockly exposes for the toolbox
    container's own dimensions, unlike block/flyout chrome. */
 @media (max-width: 480px) {
-	.blocklyToolboxDiv { max-width: 42vw; }
-	.blocklyTreeRow { overflow: hidden; }
+	.blocklyToolboxDiv,
+	.blocklyToolbox { max-width: 42vw; }
+	.blocklyTreeRow,
+	.blocklyToolboxCategory { overflow: hidden; }
 	/* A smaller font, not ellipsis-truncation: the "(NNN)" entry count is the
 	   more load-bearing half of a cramped label (it's what tells a learner
 	   whether a category is worth opening at all), and clipping arrives with
 	   no visible "…" cue here (Blockly's own label markup doesn't support
 	   text-overflow the way a plain block-level element does) -- a clipped
 	   "Stems — nouns (21" reads as broken, not as "there's more here." */
-	.blocklyTreeLabel { font-size: 0.75rem; }
+	.blocklyTreeLabel,
+	.blocklyToolboxDiv [role="treeitem"],
+	.blocklyToolbox [role="treeitem"] { font-size: 0.75rem; }
 }
 
 #breakdown {

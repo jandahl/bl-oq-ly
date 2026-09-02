@@ -273,12 +273,16 @@ concern that belongs in oq) as Blockly connection checks.
 
 ## Running locally
 
-No build step. The site lives in `docs/` (so GitHub Pages can publish
-straight from `master`/`docs`, no Actions workflow needed). Any static file
-server works, e.g.:
+The site lives in `docs/` (so GitHub Pages can publish straight from
+`master`/`docs`, no Actions workflow needed). Blockly is pinned in
+`package.json`/`package-lock.json` and bundled into the committed
+`docs/vendor/blockly.js` artifact. Rebuild that artifact after dependency
+changes, then use any static file server, e.g.:
 
 ```bash
-cd docs && python3 -m http.server 8000
+npm install
+npm run build:vendor
+npm run serve
 ```
 
 Then open `http://localhost:8000/`. (A plain `file://` open won't work —

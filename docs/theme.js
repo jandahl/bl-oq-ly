@@ -25,7 +25,7 @@ const OQ_STYLE_PATHS = {
 	oq_neutral: [],
 };
 
-/** Blockly 11 rejects CSS hsl() strings, while oq's canonical API returns
+/** Blockly 12 rejects CSS hsl() strings, while oq's canonical API returns
  * exactly that format. Convert only the representation at this boundary;
  * the colour coordinates themselves remain API-owned. */
 function blocklyColour(hsl) {
