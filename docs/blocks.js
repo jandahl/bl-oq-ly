@@ -72,6 +72,7 @@ const VERB_OBJECT_CONNECTION_TYPE = "VERB_OBJECT";
 const VERB_MOOD_CONNECTION_TYPE = "VERB_MOOD";
 const VERB_SUBJECT_CONNECTION_TYPE = "VERB_SUBJECT";
 const INFLECTION_BLOCK_STYLE = "oq_inflectional_blocks";
+const UI_INDENT = "\u00a0\u00a0\u00a0\u00a0";
 
 // grammarian's lexical_facts.morpheme_type enum (verified against the live
 // published catalog — see README's "Morpheme catalog" note). Order here is
@@ -400,10 +401,14 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 
 			this.appendDummyInput("RESOLVED")
 				.appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
-			this.appendDummyInput("CONFIG")
-				.appendField("Verb ending")
-				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD")
-				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityOptions), "POLARITY")
+			this.appendDummyInput("MOOD_ROW")
+				.appendField(`${UI_INDENT}Mood`)
+				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD");
+			this.appendDummyInput("POLARITY_ROW")
+				.appendField(`${UI_INDENT}Polarity`)
+				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityOptions), "POLARITY");
+			this.appendDummyInput("SUBJECT_ROW")
+				.appendField(`${UI_INDENT}Person`)
 				.appendField(new Blockly.FieldDropdown(function () {
 					const source = this.getSourceBlock();
 					return subjectCombosFor(source, verbEndingIndex)
@@ -411,7 +416,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 				}), "SUBJECT");
 			this.appendValueInput("OBJECT_SLOT")
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
-				.appendField("object (optional)");
+				.appendField(`${UI_INDENT}Object (optional)`);
 			this.appendDummyInput("VARIANT_GROUP")
 				.appendField("variant")
 				.appendField(new Blockly.FieldDropdown(function () {
