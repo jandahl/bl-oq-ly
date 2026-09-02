@@ -157,7 +157,7 @@ test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisu
 	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ })).toBeVisible();
 });
 
-test("Build: verb ending composes typed mood/subject blocks and offers a variant for a duplicate-coordinate combination", async ({ page }) => {
+test("Build: verb ending exposes inline mood, polarity, and subject controls", async ({ page }) => {
 	const result = await page.evaluate(() => {
 		const ws = Blockly.getMainWorkspace();
 		const block = ws.newBlock("morpheme_block__verb_ending_picker");
@@ -168,64 +168,54 @@ test("Build: verb ending composes typed mood/subject blocks and offers a variant
 			resolved: block.getFieldValue("RESOLVED"),
 			hasOwnMoodField: block.getField("MOOD") !== null,
 		};
-		const mood = ws.newBlock("morpheme_block__verb_mood");
-		const subject = ws.newBlock("morpheme_block__verb_subject");
-		mood.initSvg(); mood.render();
-		subject.initSvg(); subject.render();
-		block.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
-		block.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
 		Blockly.Blocks[block.type].__resolve(block);
 		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), hasObject: block.getInputTargetBlock("OBJECT_SLOT") !== null };
 
-		mood.setFieldValue("interrogative", "MOOD");
-		subject.setFieldValue("3|sg", "COMBO");
+		block.setFieldValue("interrogative", "MOOD");
+		block.setFieldValue("3|sg", "SUBJECT");
 		Blockly.Blocks[block.type].__resolve(block);
 		const afterChange = { data: block.data, resolved: block.getFieldValue("RESOLVED") };
 
-		// contemporative/intransitive/1sg is a real duplicate-coordinate combo
-		// (plain vs. negative contemporative) -- see verb-endings.js's own comment.
-		mood.setFieldValue("contemporative", "MOOD");
-		subject.setFieldValue("1|sg", "COMBO");
+		// Polarity is explicit: the dependent field exposes the negative
+		// contemporative instead of treating it as an opaque variant.
+		block.setFieldValue("contemporative", "MOOD");
+		block.setFieldValue("1|sg", "SUBJECT");
+		block.setFieldValue("negative", "POLARITY");
 		Blockly.Blocks[block.type].__resolve(block);
-		const variant = { visible: block.getInput("VARIANT_GROUP").isVisible(), optionCount: block.verbPickerState.candidateOptions.length };
+		const negative = { data: block.data, polarity: block.getFieldValue("POLARITY"), variantVisible: block.getInput("VARIANT_GROUP").isVisible() };
 
 		block.dispose(false);
-		return { incomplete, initial, afterChange, variant };
+		return { incomplete, initial, afterChange, negative };
 	});
 
-	expect(result.incomplete.data).toBeNull();
-	expect(result.incomplete.resolved).toContain("add a mood");
-	expect(result.incomplete.hasOwnMoodField).toBe(false);
+	expect(result.incomplete.data).toBeTruthy();
+	expect(result.incomplete.resolved).not.toBe("");
+	expect(result.incomplete.hasOwnMoodField).toBe(true);
 	expect(result.initial.data).toBeTruthy();
 	expect(result.initial.resolved).not.toBe("");
 	expect(result.initial.hasObject).toBe(false); // nothing plugged into OBJECT_SLOT yet -- intransitive
 	expect(result.afterChange.data).toBeTruthy();
 	expect(result.afterChange.resolved).not.toContain("(no such ending"); // interrogative 3sg is a real form
-	expect(result.variant.visible).toBe(true);
-	expect(result.variant.optionCount).toBeGreaterThan(1);
+	expect(result.negative).toEqual({ data: "V_CONTNEG_1SG", polarity: "negative", variantVisible: false });
 });
 
-test("Build: the palette's verb ending arrives with working, replaceable mood and subject shadow defaults", async ({ page }) => {
+test("Build: the palette's verb ending arrives with inline mood, polarity, and subject fields", async ({ page }) => {
 	await dragFirstFlyoutBlockIntoWorkspace(page, "Inflectional endings", 420, 180);
 	const result = await page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false)
 			.find((candidate) => candidate.type === "morpheme_block__verb_ending_picker");
-		const mood = block?.getInputTargetBlock("MOOD_SLOT");
-		const subject = block?.getInputTargetBlock("SUBJECT_SLOT");
 		return block && {
 			data: block.data,
-			moodType: mood?.type,
-			moodIsShadow: mood?.isShadow(),
-			subjectType: subject?.type,
-			subjectIsShadow: subject?.isShadow(),
+			mood: block.getFieldValue("MOOD"),
+			polarity: block.getFieldValue("POLARITY"),
+			subject: block.getFieldValue("SUBJECT"),
 		};
 	});
 	expect(result).toEqual({
 		data: "V_IND_INTR_1SG",
-		moodType: "morpheme_block__verb_mood",
-		moodIsShadow: true,
-		subjectType: "morpheme_block__verb_subject",
-		subjectIsShadow: true,
+		mood: "indicative",
+		polarity: "positive",
+		subject: "1|sg",
 	});
 
 	// Renderer changes rebuild the workspace through serialization; the
@@ -236,10 +226,11 @@ test("Build: the palette's verb ending arrives with working, replaceable mood an
 			.find((candidate) => candidate.type === "morpheme_block__verb_ending_picker");
 		return block && {
 			data: block.data,
-			mood: block.getInputTargetBlock("MOOD_SLOT")?.getFieldValue("MOOD"),
-			subject: block.getInputTargetBlock("SUBJECT_SLOT")?.getFieldValue("COMBO"),
+			mood: block.getFieldValue("MOOD"),
+			polarity: block.getFieldValue("POLARITY"),
+			subject: block.getFieldValue("SUBJECT"),
 		};
-	})).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", subject: "1|sg" });
+	})).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", polarity: "positive", subject: "1|sg" });
 });
 
 test("Build: plugging a verb-object block into the picker's OBJECT_SLOT makes it transitive and drives the conjugation; unplugging reverts to intransitive (bl-oq-ly#20 follow-up)", async ({ page }) => {
@@ -255,12 +246,6 @@ test("Build: plugging a verb-object block into the picker's OBJECT_SLOT makes it
 		const picker = ws.newBlock("morpheme_block__verb_ending_picker");
 		picker.initSvg();
 		picker.render();
-		const mood = ws.newBlock("morpheme_block__verb_mood");
-		const subject = ws.newBlock("morpheme_block__verb_subject");
-		mood.initSvg(); mood.render();
-		subject.initSvg(); subject.render();
-		picker.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
-		picker.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
 		Blockly.Blocks[picker.type].__resolve(picker);
 		window.__picker = picker;
 		return { data: picker.data, resolved: picker.getFieldValue("RESOLVED") };
@@ -307,13 +292,7 @@ test("Build: verb ending picker, once connected into a chain, builds the real wo
 		affix.initSvg(); affix.render();
 		const ending = ws.newBlock("morpheme_block__verb_ending_picker");
 		ending.initSvg(); ending.render();
-		const mood = ws.newBlock("morpheme_block__verb_mood");
-		const subject = ws.newBlock("morpheme_block__verb_subject");
-		mood.initSvg(); mood.render();
-		subject.initSvg(); subject.render();
-		ending.getInput("MOOD_SLOT").connection.connect(mood.outputConnection);
-		ending.getInput("SUBJECT_SLOT").connection.connect(subject.outputConnection);
-		Blockly.Blocks[ending.type].__resolve(ending); // selector defaults resolve to V_IND_INTR_1SG
+		Blockly.Blocks[ending.type].__resolve(ending); // inline defaults resolve to V_IND_INTR_1SG
 		stem.nextConnection.connect(affix.previousConnection);
 		affix.nextConnection.connect(ending.previousConnection);
 	});
@@ -515,16 +494,15 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 	// dragging a fresh picker from the toolbox).
 	const endingBlock = await page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
-		const mood = block?.getInputTargetBlock("MOOD_SLOT");
-		const subject = block?.getInputTargetBlock("SUBJECT_SLOT");
 		return block && {
 			data: block.data,
-			mood: mood?.getFieldValue("MOOD"),
-			moodOptionCount: mood?.getField("MOOD").getOptions().length,
-			subject: subject?.getFieldValue("COMBO"),
+			mood: block.getFieldValue("MOOD"),
+			moodOptionCount: block.getField("MOOD").getOptions().length,
+			polarity: block.getFieldValue("POLARITY"),
+			subject: block.getFieldValue("SUBJECT"),
 		};
 	});
-	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9, subject: "1|sg" });
+	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9, polarity: "positive", subject: "1|sg" });
 });
 
 test("Build: a restored verb ending block (Move to Word Builder) stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
@@ -537,7 +515,7 @@ test("Build: a restored verb ending block (Move to Word Builder) stays live -- c
 
 	const afterChange = await page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
-		block.getInputTargetBlock("MOOD_SLOT").setFieldValue("optative", "MOOD");
+		block.setFieldValue("optative", "MOOD");
 		Blockly.Blocks[block.type].__resolve(block);
 		return { data: block.data, resolved: block.getFieldValue("RESOLVED") };
 	});
@@ -561,9 +539,9 @@ test("Shareable links: a chain link naming one of the duplicate-coordinate varia
 	await expect(page2.locator("#status-line")).toHaveText("nerinanga", { timeout: 20_000 });
 	const block = await page2.evaluate(() => {
 		const b = Blockly.getMainWorkspace().getAllBlocks(false).find((b) => b.type === "morpheme_block__verb_ending_picker");
-		return b && { data: b.data, variant: b.getFieldValue("VARIANT") };
+	return b && { data: b.data, polarity: b.getFieldValue("POLARITY"), variant: b.getFieldValue("VARIANT") };
 	});
-	expect(block).toEqual({ data: "V_CONTNEG_1SG", variant: "V_CONTNEG_1SG" });
+	expect(block).toEqual({ data: "V_CONTNEG_1SG", polarity: "negative", variant: "NONE" });
 	await page2.close();
 });
 

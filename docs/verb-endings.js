@@ -46,8 +46,8 @@ function orderedUnique(values, preferredOrder) {
 	return ordered;
 }
 
-function keyOf(mood, transitivity, sPerson, sNumber, oPerson, oNumber) {
-	return [mood, transitivity, sPerson, sNumber, oPerson ?? "", oNumber ?? ""].join("|");
+function keyOf(mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity = "positive") {
+	return [mood, transitivity, sPerson, sNumber, oPerson ?? "", oNumber ?? "", polarity].join("|");
 }
 
 function personNumberKey(person, number) {
@@ -58,12 +58,14 @@ function personNumberKey(person, number) {
  * @param {any[]} presets
  * @returns {{
  *   index: Map<string, Array<{ id: string, label: string }>>,
- *   moods: string[], transitivities: string[],
+ *   moods: string[], transitivities: string[], polarities: string[],
+ *   polaritiesByMood: Map<string, string[]>,
  *   subjectCombos: string[], objectCombos: string[],
  * }}
  */
 export function buildVerbEndingIndex(presets) {
-	const moods = [], transitivities = [], subjectCombos = [], objectCombos = [];
+	const moods = [], transitivities = [], polarities = [], subjectCombos = [], objectCombos = [];
+	const polaritiesByMood = new Map();
 	/** @type {Map<string, Array<{ id: string, label: string }>>} */
 	const index = new Map();
 
@@ -71,12 +73,17 @@ export function buildVerbEndingIndex(presets) {
 		const inflection = preset.seq?.[0]?.inflection;
 		if (preset.morpheme_type !== "inflectional_ending" || !inflection?.subject) continue;
 		const { mood, transitivity, subject, object } = inflection;
+		const polarity = inflection.polarity ?? "positive";
 		moods.push(mood);
 		transitivities.push(transitivity);
+		polarities.push(polarity);
+		const moodPolarities = polaritiesByMood.get(mood) ?? [];
+		if (!moodPolarities.includes(polarity)) moodPolarities.push(polarity);
+		polaritiesByMood.set(mood, moodPolarities);
 		subjectCombos.push(personNumberKey(subject.person, subject.number));
 		if (object) objectCombos.push(personNumberKey(object.person, object.number));
 
-		const key = keyOf(mood, transitivity, subject.person, subject.number, object?.person, object?.number);
+		const key = keyOf(mood, transitivity, subject.person, subject.number, object?.person, object?.number, polarity);
 		const label = preset.meaning || preset.glossShort || preset.id;
 		const list = index.get(key) ?? [];
 		list.push({ id: preset.id, label });
@@ -87,14 +94,16 @@ export function buildVerbEndingIndex(presets) {
 		index,
 		moods: orderedUnique(moods, MOOD_ORDER),
 		transitivities: orderedUnique(transitivities, TRANSITIVITY_ORDER),
+		polarities: orderedUnique(polarities, ["positive", "negative"]),
+		polaritiesByMood: new Map([...polaritiesByMood].map(([mood, values]) => [mood, orderedUnique(values, ["positive", "negative"])])),
 		subjectCombos: orderedUnique(subjectCombos, PERSON_NUMBER_ORDER),
 		objectCombos: orderedUnique(objectCombos, PERSON_NUMBER_ORDER),
 	};
 }
 
 /** Looks up the candidate(s) for one paradigm coordinate. Empty array = no such ending in the catalog. */
-export function candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber) {
-	return verbEndingIndex.index.get(keyOf(mood, transitivity, sPerson, sNumber, oPerson, oNumber)) ?? [];
+export function candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity = "positive") {
+	return verbEndingIndex.index.get(keyOf(mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity)) ?? [];
 }
 
 /** Splits a combined "person|number" dropdown value back into its two parts. */

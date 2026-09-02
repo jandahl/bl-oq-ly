@@ -169,17 +169,14 @@ no reason connected to the content being shared. They stay in
 "Inflectional endings" replaces ~278 individual verb-mood ending entries
 (one per real mood × transitivity × subject × object combination — a flat
 scroll no learner should have to search) with a single conjugation-style
-picker block at the top of the category (bl-oq-ly#18). Two plain Blockly
-value blocks — mood and subject — plug into typed sockets and resolve live
-to a real morpheme id shown on the parent (`buildWord`'s own spelling +
-gloss). The toolbox parent includes both as replaceable shadow defaults, so
-it works immediately when dragged while still making its grammar visible.
-Each selector is also listed separately for easy replacement. A "variant"
-dropdown appears only for the ~23 real endings that share identical
-paradigm coordinates (e.g. plain vs. negative contemporative), letting the
-learner choose between them. `docs/verb-endings.js` builds the paradigm
-index from grammarian's own catalog and looks up candidates by coordinate;
-`docs/blocks.js` owns the block/field wiring.
+picker block at the top of the category (bl-oq-ly#18). Three plain Blockly
+fields — mood, polarity, and subject — resolve live to a real morpheme id
+shown on the parent (`buildWord`'s own spelling + gloss). The polarity field
+depends on the selected mood, so affirmative and negative endings are not
+hidden as opaque variants. A "variant" dropdown remains only when multiple
+endings still share the same complete coordinate. `docs/verb-endings.js`
+builds the paradigm index from the grammarian's own catalog and looks up
+candidates by coordinate; `docs/blocks.js` owns the block/field wiring.
 
 The object is the third typed puzzle-piece value
 socket (`OBJECT_SLOT`), dangling and optional the same way a math block's
@@ -215,11 +212,11 @@ so those two stay plain, dependency-free and unit-testable under Node.
 
 A verb ending block placed on the canvas any other way -- Deconstruct's
 "Move to Word Builder," or restoring a shared `?chain=...` link -- is a real
-picker instance too, with real mood/subject blocks set to match that exact
-id, an object block connected for a transitive ending, and the variant
-dropdown set for one of the ~23 duplicate-coordinate ids -- not a frozen
-label with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s `renderChain()`
-builds these via `restoreVerbPickerFields()`.
+picker instance too, with mood/polarity/subject fields set to match that
+exact id, an object block connected for a transitive ending, and the variant
+dropdown set when the complete coordinate is ambiguous -- not a frozen label
+with no dropdowns at all (bl-oq-ly#20). `blocks.js`'s `renderChain()` builds
+these via `restoreVerbPickerFields()`.
 
 ### Mobile
 
