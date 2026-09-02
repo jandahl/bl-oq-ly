@@ -60,12 +60,14 @@ function personNumberKey(person, number) {
  *   index: Map<string, Array<{ id: string, label: string }>>,
  *   moods: string[], transitivities: string[], polarities: string[],
  *   polaritiesByMood: Map<string, string[]>,
+ *   subjectCombosByMoodTransitivity: Map<string, string[]>,
  *   subjectCombos: string[], objectCombos: string[],
  * }}
  */
 export function buildVerbEndingIndex(presets) {
 	const moods = [], transitivities = [], polarities = [], subjectCombos = [], objectCombos = [];
 	const polaritiesByMood = new Map();
+	const subjectCombosByMoodTransitivity = new Map();
 	/** @type {Map<string, Array<{ id: string, label: string }>>} */
 	const index = new Map();
 
@@ -81,6 +83,11 @@ export function buildVerbEndingIndex(presets) {
 		if (!moodPolarities.includes(polarity)) moodPolarities.push(polarity);
 		polaritiesByMood.set(mood, moodPolarities);
 		subjectCombos.push(personNumberKey(subject.person, subject.number));
+		const subjectKey = `${mood}|${transitivity}`;
+		const subjectCombo = personNumberKey(subject.person, subject.number);
+		const moodSubjects = subjectCombosByMoodTransitivity.get(subjectKey) ?? [];
+		if (!moodSubjects.includes(subjectCombo)) moodSubjects.push(subjectCombo);
+		subjectCombosByMoodTransitivity.set(subjectKey, moodSubjects);
 		if (object) objectCombos.push(personNumberKey(object.person, object.number));
 
 		const key = keyOf(mood, transitivity, subject.person, subject.number, object?.person, object?.number, polarity);
@@ -96,6 +103,7 @@ export function buildVerbEndingIndex(presets) {
 		transitivities: orderedUnique(transitivities, TRANSITIVITY_ORDER),
 		polarities: orderedUnique(polarities, ["positive", "negative"]),
 		polaritiesByMood: new Map([...polaritiesByMood].map(([mood, values]) => [mood, orderedUnique(values, ["positive", "negative"])])),
+		subjectCombosByMoodTransitivity: new Map([...subjectCombosByMoodTransitivity].map(([key, values]) => [key, orderedUnique(values, PERSON_NUMBER_ORDER)])),
 		subjectCombos: orderedUnique(subjectCombos, PERSON_NUMBER_ORDER),
 		objectCombos: orderedUnique(objectCombos, PERSON_NUMBER_ORDER),
 	};

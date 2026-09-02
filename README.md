@@ -178,6 +178,13 @@ endings still share the same complete coordinate. `docs/verb-endings.js`
 builds the paradigm index from the grammarian's own catalog and looks up
 candidates by coordinate; `docs/blocks.js` owns the block/field wiring.
 
+The subject menu is also constrained by the selected mood and by whether an
+object is plugged in, so Question and Command offer only the persons for
+which the API has a real ending. Ordinary negative Statement and Question
+are composed with the separate `-nngit` sentential-affix block; the catalog's
+negative inflectional endings are the special Contemporative forms, so the
+picker does not invent unsupported negative endings for other moods.
+
 The object is the third typed puzzle-piece value
 socket (`OBJECT_SLOT`), dangling and optional the same way a math block's
 own operand socket can sit empty (bl-oq-ly#20 follow-up). Plugging a small

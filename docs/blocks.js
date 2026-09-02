@@ -270,6 +270,13 @@ function verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePerson
 	return { moodOptions, subjectOptions, polarityOptions, polarityMapping };
 }
 
+function subjectCombosFor(block, verbEndingIndex) {
+	const mood = block?.getFieldValue("MOOD");
+	const transitivity = block?.getInputTargetBlock("OBJECT_SLOT") ? "transitive" : "intransitive";
+	return verbEndingIndex.subjectCombosByMoodTransitivity.get(`${mood}|${transitivity}`)
+		?? verbEndingIndex.subjectCombos;
+}
+
 /**
  * Recomputes which real morpheme id the picker's grammatical controls
  * resolve to, and updates the
@@ -285,7 +292,13 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	const moodBlock = block.getInputTargetBlock("MOOD_SLOT");
 	const subjectBlock = block.getInputTargetBlock("SUBJECT_SLOT");
 	const mood = block.getFieldValue("MOOD") ?? moodBlock?.getFieldValue("MOOD");
-	const subjectValue = block.getFieldValue("SUBJECT") ?? subjectBlock?.getFieldValue("COMBO");
+	let subjectValue = block.getFieldValue("SUBJECT") ?? subjectBlock?.getFieldValue("COMBO");
+	const subjectField = block.getField("SUBJECT");
+	const validSubjects = subjectCombosFor(block, verbEndingIndex);
+	if (subjectField && validSubjects.length && !validSubjects.includes(subjectValue)) {
+		subjectField.setValue(validSubjects[0]);
+		subjectValue = validSubjects[0];
+	}
 	const { person: sPerson, number: sNumber } = subjectValue
 		? parsePersonNumber(subjectValue)
 		: { person: undefined, number: undefined };
@@ -385,11 +398,17 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 		init() {
 			this.verbPickerState = { candidateOptions: [["—", "NONE"]] };
 
+			this.appendDummyInput("RESOLVED")
+				.appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
 			this.appendDummyInput("CONFIG")
 				.appendField("Verb ending")
 				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD")
 				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityOptions), "POLARITY")
-				.appendField(new Blockly.FieldDropdown(subjectOptions), "SUBJECT");
+				.appendField(new Blockly.FieldDropdown(function () {
+					const source = this.getSourceBlock();
+					return subjectCombosFor(source, verbEndingIndex)
+						.map((combo) => [personNumberLabel(combo, resolvePersonLabel), combo]);
+				}), "SUBJECT");
 			this.appendValueInput("OBJECT_SLOT")
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
 				.appendField("object (optional)");
@@ -406,13 +425,10 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 					// at once.
 					return this.getSourceBlock()?.verbPickerState?.candidateOptions ?? [["—", "NONE"]];
 				}, onVariantChange), "VARIANT");
-			this.appendDummyInput()
-				.appendField(new Blockly.FieldLabelSerializable(""), "RESOLVED");
-
 			this.setPreviousStatement(true, CONNECTION_TYPE);
 			this.setNextStatement(true, CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
-			this.setInputsInline(true);
+			this.setInputsInline(false);
 			resolveVerbPicker(this, verbEndingIndex, presetsById, getDisplayOptions);
 		},
 	};
