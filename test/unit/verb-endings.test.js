@@ -70,6 +70,17 @@ test("buildVerbEndingIndex: polarity is a real coordinate and negative endings d
 	assert.deepEqual(index.polaritiesByMood.get("contemporative"), ["positive", "negative"]);
 });
 
+test("buildVerbEndingIndex: subject choices are constrained by mood and transitivity", () => {
+	const index = buildVerbEndingIndex([
+		verbEndingPreset("V_IND_INTR_1SG", "indicative", "intransitive", { person: 1, number: "sg" }),
+		verbEndingPreset("V_INTERR_INTR_2SG", "interrogative", "intransitive", { person: 2, number: "sg" }),
+		verbEndingPreset("V_IMP_INTR_2SG", "imperative", "intransitive", { person: 2, number: "sg" }),
+	]);
+	assert.deepEqual(index.subjectCombosByMoodTransitivity.get("indicative|intransitive"), ["1|sg"]);
+	assert.deepEqual(index.subjectCombosByMoodTransitivity.get("interrogative|intransitive"), ["2|sg"]);
+	assert.deepEqual(index.subjectCombosByMoodTransitivity.get("imperative|intransitive"), ["2|sg"]);
+});
+
 test("candidatesFor: an unknown combination returns an empty array, never throws or returns undefined", () => {
 	const index = buildVerbEndingIndex([]);
 	assert.deepEqual(candidatesFor(index, "indicative", "intransitive", 1, "sg"), []);

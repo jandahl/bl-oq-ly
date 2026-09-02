@@ -167,14 +167,21 @@ test("Build: verb ending exposes inline mood, polarity, and subject controls", a
 			data: block.data,
 			resolved: block.getFieldValue("RESOLVED"),
 			hasOwnMoodField: block.getField("MOOD") !== null,
+			inputOrder: block.inputList.map((input) => input.name),
+			inputsInline: block.inputsInline,
 		};
 		Blockly.Blocks[block.type].__resolve(block);
 		const initial = { data: block.data, resolved: block.getFieldValue("RESOLVED"), hasObject: block.getInputTargetBlock("OBJECT_SLOT") !== null };
 
 		block.setFieldValue("interrogative", "MOOD");
+		Blockly.Blocks[block.type].__resolve(block);
+		const questionDefault = { data: block.data, subject: block.getFieldValue("SUBJECT") };
 		block.setFieldValue("3|sg", "SUBJECT");
 		Blockly.Blocks[block.type].__resolve(block);
 		const afterChange = { data: block.data, resolved: block.getFieldValue("RESOLVED") };
+		block.setFieldValue("imperative", "MOOD");
+		Blockly.Blocks[block.type].__resolve(block);
+		const commandDefault = { data: block.data, subject: block.getFieldValue("SUBJECT") };
 
 		// Polarity is explicit: the dependent field exposes the negative
 		// contemporative instead of treating it as an opaque variant.
@@ -185,15 +192,20 @@ test("Build: verb ending exposes inline mood, polarity, and subject controls", a
 		const negative = { data: block.data, polarity: block.getFieldValue("POLARITY"), variantVisible: block.getInput("VARIANT_GROUP").isVisible() };
 
 		block.dispose(false);
-		return { incomplete, initial, afterChange, negative };
+		return { incomplete, initial, questionDefault, commandDefault, afterChange, negative };
 	});
 
 	expect(result.incomplete.data).toBeTruthy();
 	expect(result.incomplete.resolved).not.toBe("");
 	expect(result.incomplete.hasOwnMoodField).toBe(true);
+	expect(result.incomplete.inputOrder[0]).toBe("RESOLVED");
+	expect(result.incomplete.inputsInline).toBe(false);
 	expect(result.initial.data).toBeTruthy();
 	expect(result.initial.resolved).not.toBe("");
 	expect(result.initial.hasObject).toBe(false); // nothing plugged into OBJECT_SLOT yet -- intransitive
+	expect(result.questionDefault).toEqual({ data: "V_INTERR_INTR_3SG", subject: "3|sg" });
+	expect(result.commandDefault.data).toMatch(/^V_IMP_INTR_/);
+	expect(["2|sg", "1|pl", "2|pl"]).toContain(result.commandDefault.subject);
 	expect(result.afterChange.data).toBeTruthy();
 	expect(result.afterChange.resolved).not.toContain("(no such ending"); // interrogative 3sg is a real form
 	expect(result.negative).toEqual({ data: "V_CONTNEG_1SG", polarity: "negative", variantVisible: false });
