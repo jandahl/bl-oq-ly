@@ -23894,6 +23894,122 @@ ${b} to its parent, because: ${a}`);
     }
   });
 
+  // node_modules/@blockly/field-dependent-dropdown/dist/index.js
+  var require_dist = __commonJS({
+    "node_modules/@blockly/field-dependent-dropdown/dist/index.js"(exports, module) {
+      !(function(e, t) {
+        if ("object" == typeof exports && "object" == typeof module) module.exports = t(require_blockly_compressed());
+        else if ("function" == typeof define && define.amd) define(["blockly/core"], t);
+        else {
+          var n = "object" == typeof exports ? t(require_blockly_compressed()) : t(e.Blockly);
+          for (var o in n) ("object" == typeof exports ? exports : e)[o] = n[o];
+        }
+      })(exports, (e) => (() => {
+        "use strict";
+        var t = { 370: (t2) => {
+          t2.exports = e;
+        } }, n = {};
+        function o(e2) {
+          var i2 = n[e2];
+          if (void 0 !== i2) return i2.exports;
+          var s2 = n[e2] = { exports: {} };
+          return t[e2](s2, s2.exports, o), s2.exports;
+        }
+        o.d = (e2, t2) => {
+          for (var n2 in t2) o.o(t2, n2) && !o.o(e2, n2) && Object.defineProperty(e2, n2, { enumerable: true, get: t2[n2] });
+        }, o.o = (e2, t2) => Object.prototype.hasOwnProperty.call(e2, t2), o.r = (e2) => {
+          "undefined" != typeof Symbol && Symbol.toStringTag && Object.defineProperty(e2, Symbol.toStringTag, { value: "Module" }), Object.defineProperty(e2, "__esModule", { value: true });
+        };
+        var i = {};
+        o.r(i), o.d(i, { FieldDependentDropdown: () => l });
+        var s = o(370);
+        function r(e2, t2) {
+          return e2.length === t2.length && e2.every((e3, n2) => {
+            const o2 = t2[n2];
+            return Array.isArray(e3) && Array.isArray(o2) ? r(e3, o2) : e3 === o2;
+          });
+        }
+        class a extends s.Events.BlockBase {
+          constructor(e2, t2, n2, o2, i2, s2) {
+            super(e2), this.type = a.EVENT_TYPE, e2 && t2 && n2 && o2 && i2 && s2 && (this.name = t2, this.oldValue = n2, this.newValue = o2, this.oldOptions = i2, this.newOptions = s2);
+          }
+          toJson() {
+            const e2 = super.toJson();
+            if (!(this.name && this.oldValue && this.newValue && this.oldOptions && this.newOptions)) throw new Error("The changed element is undefined. Either pass all needed parameters to the constructor, or call fromJson.");
+            return e2.name = this.name, e2.oldValue = this.oldValue, e2.newValue = this.newValue, e2.oldOptions = this.oldOptions, e2.newOptions = this.newOptions, e2;
+          }
+          static fromJson(e2, t2, n2) {
+            const o2 = super.fromJson(e2, t2, n2);
+            return o2.name = e2.name, o2.oldValue = e2.oldValue, o2.newValue = e2.newValue, o2.oldOptions = e2.oldOptions, o2.newOptions = e2.newOptions, o2;
+          }
+          isNull() {
+            const e2 = this.oldValue === this.newValue, t2 = this.oldOptions === this.newOptions || Array.isArray(this.oldOptions) && Array.isArray(this.newOptions) && r(this.oldOptions, this.newOptions);
+            return e2 && t2;
+          }
+          run(e2) {
+            if (!(this.blockId && this.name && this.oldValue && this.newValue && this.oldOptions && this.newOptions)) return void console.warn("Can't run uninitialized event.");
+            const t2 = this.getEventWorkspace_().getBlockById(this.blockId);
+            if (!t2) return void console.warn("Can't change non-existent block: " + this.blockId);
+            const n2 = t2.getField(this.name);
+            if (!n2) return void console.warn("Can't change non-existent dropdown field: " + this.name);
+            const o2 = e2 ? this.newValue : this.oldValue, i2 = e2 ? this.newOptions : this.oldOptions;
+            n2.dependencyData.derivedOptions = i2, n2.getOptions(false), n2.setValue(o2);
+          }
+        }
+        a.EVENT_TYPE = "dropdown_options_change", s.registry.register(s.registry.Type.EVENT, a.EVENT_TYPE, a);
+        class l extends s.FieldDropdown {
+          constructor(e2, t2, n2, o2, i2) {
+            const s2 = {};
+            super(() => {
+              if (s2.derivedOptions) return s2.derivedOptions;
+              if (s2.parentField) {
+                const e3 = s2.parentField.getValue();
+                if (e3) {
+                  const n3 = t2[e3];
+                  if (n3) return n3;
+                }
+              }
+              return n2 || [["", ""]];
+            }, o2, i2), this.parentName = e2, this.optionMapping = t2, this.defaultOptions = n2, this.dependencyData = s2;
+          }
+          static fromJson(e2) {
+            return new l(e2.parentName, e2.optionMapping, e2.defaultOptions, void 0, e2);
+          }
+          setSourceBlock(e2) {
+            var t2;
+            super.setSourceBlock(e2);
+            const n2 = e2.getField(this.parentName);
+            if (!n2) throw new Error("Could not find a parent field with the name " + this.parentName + " for the dependent dropdown.");
+            this.dependencyData.parentField = n2;
+            const o2 = n2.getValidator();
+            n2.setValidator((e3) => {
+              if (o2) {
+                const t3 = o2(e3);
+                if (null === t3) return null;
+                void 0 !== t3 && (e3 = t3);
+              }
+              return this.updateOptionsBasedOnNewValue(e3), e3;
+            }), this.updateOptionsBasedOnNewValue(null !== (t2 = n2.getValue()) && void 0 !== t2 ? t2 : void 0);
+          }
+          updateOptionsBasedOnNewValue(e2) {
+            if (null == e2) return;
+            const t2 = this.getSourceBlock();
+            if (!t2) throw new Error("Could not validate a field that is not attached to a block: " + this.name);
+            const n2 = this.getValue(), o2 = this.getOptions(false);
+            let i2 = this.optionMapping[e2];
+            if (!i2) {
+              if (!this.defaultOptions) return void console.warn("Could not find child options for the parent value: " + e2);
+              i2 = this.defaultOptions;
+            }
+            const r2 = null != i2.find((e3) => e3[1] == n2) ? n2 : i2[0][1];
+            this.dependencyData.derivedOptions = i2, this.getOptions(false), s.Events.disable(), this.setValue(r2), s.Events.enable(), s.Events.getRecordUndo() && (s.Events.getGroup() || (s.Events.setGroup(true), setTimeout(() => s.Events.setGroup(false))), s.Events.fire(new a(t2, this.name, null != n2 ? n2 : void 0, null != r2 ? r2 : void 0, o2, i2)));
+          }
+        }
+        return s.fieldRegistry.register("field_dependent_dropdown", l), i;
+      })());
+    }
+  });
+
   // node_modules/blockly/index.mjs
   var blockly_exports = {};
   __export(blockly_exports, {
@@ -24685,7 +24801,9 @@ ${b} to its parent, because: ${a}`);
   } = import_en.default;
 
   // tools/vendor-entry.js
+  var import_field_dependent_dropdown = __toESM(require_dist(), 1);
   globalThis.Blockly = blockly_exports;
+  globalThis.FieldDependentDropdown = import_field_dependent_dropdown.FieldDependentDropdown;
 })();
 /*! Bundled license information:
 
@@ -24695,4 +24813,7 @@ blockly/index.js:
    * Copyright 2019 Google LLC
    * SPDX-License-Identifier: Apache-2.0
    *)
+
+@blockly/field-dependent-dropdown/dist/index.js:
+  (*! For license information please see index.js.LICENSE.txt *)
 */

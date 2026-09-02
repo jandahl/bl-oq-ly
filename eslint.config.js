@@ -20,6 +20,7 @@ const browserGlobals = {
 	// etc.), never imported — see docs/blocks.js's/theme.js's own comments on
 	// why this can't be a normal ES import.
 	Blockly: "readonly",
+	FieldDependentDropdown: "readonly",
 };
 
 const nodeGlobals = {

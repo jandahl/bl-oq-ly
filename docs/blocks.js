@@ -224,11 +224,9 @@ function isMorphemeBlockType(type) {
 // Verb ending picker (bl-oq-ly#18, object-as-plug-in bl-oq-ly#20 follow-up)
 // — a conjugation-style block, the same paradigm shape as oq's own
 // conjugation modal, replacing a flat scroll through ~278 individual
-// mood-ending entries with three typed value sockets. Mood and subject are
-// required selector blocks (provided as replaceable shadow defaults in the
-// toolbox); object is optional. Each selector still uses Blockly's standard
-// FieldDropdown internally, but the parent now makes the grammatical parts
-// visible as composition rather than hiding them in a monolithic form.
+// mood-ending entries. Mood, polarity, and subject are explicit fields on
+// the ending itself; object remains an optional typed value socket because
+// it changes valency and has its own meaningful block structure.
 //
 // Transitivity is no longer its own dropdown: it's DERIVED from whether a
 // VERB_OBJECT_TYPE block is plugged into the picker's OBJECT_SLOT value
@@ -262,27 +260,36 @@ function isMorphemeBlockType(type) {
 function verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel) {
 	const moodOptions = verbEndingIndex.moods.map((m) => [moodDisplayLabel(m, resolveMoodLabel), m]);
 	const subjectOptions = verbEndingIndex.subjectCombos.map((c) => [personNumberLabel(c, resolvePersonLabel), c]);
-	return { moodOptions, subjectOptions };
+	const polarityOptions = [["affirmative", "positive"], ["negative", "negative"]];
+	const polarityMapping = Object.fromEntries(verbEndingIndex.moods.map((mood) => [
+		mood,
+		(verbEndingIndex.polaritiesByMood.get(mood) ?? ["positive"]).map((polarity) => [
+			polarity === "negative" ? "negative" : "affirmative", polarity,
+		]),
+	]));
+	return { moodOptions, subjectOptions, polarityOptions, polarityMapping };
 }
 
 /**
- * Recomputes which real morpheme id the picker's connected selector blocks
+ * Recomputes which real morpheme id the picker's grammatical controls
  * resolve to, and updates the
  * block's visible state (variant dropdown shown only when the combination is
  * ambiguous, RESOLVED label showing the real Kalaallisut spelling+gloss).
  *
  * `variantOverride` carries the parent block's one remaining field while it
- * is in the middle of changing. Mood, subject, and object are ordinary typed
- * value blocks; the workspace listener observes them after their changes
- * commit.
+ * is in the middle of changing. Mood, polarity, and subject are fields on
+ * the parent; object is a typed value block observed by the workspace
+ * listener after its changes commit.
  */
 function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOptions, variantOverride) {
 	const moodBlock = block.getInputTargetBlock("MOOD_SLOT");
 	const subjectBlock = block.getInputTargetBlock("SUBJECT_SLOT");
-	const mood = moodBlock?.getFieldValue("MOOD");
-	const { person: sPerson, number: sNumber } = subjectBlock
-		? parsePersonNumber(subjectBlock.getFieldValue("COMBO"))
+	const mood = block.getFieldValue("MOOD") ?? moodBlock?.getFieldValue("MOOD");
+	const subjectValue = block.getFieldValue("SUBJECT") ?? subjectBlock?.getFieldValue("COMBO");
+	const { person: sPerson, number: sNumber } = subjectValue
+		? parsePersonNumber(subjectValue)
 		: { person: undefined, number: undefined };
+	const polarity = block.getFieldValue("POLARITY") ?? "positive";
 
 	const objectBlock = block.getInputTargetBlock("OBJECT_SLOT");
 	const isTransitive = objectBlock != null;
@@ -291,8 +298,8 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 		? parsePersonNumber(objectBlock.getFieldValue("COMBO"))
 		: { person: undefined, number: undefined };
 
-	const candidates = mood && subjectBlock
-		? candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber)
+	const candidates = mood && subjectValue
+		? candidatesFor(verbEndingIndex, mood, transitivity, sPerson, sNumber, oPerson, oNumber, polarity)
 		: [];
 	const variantInput = block.getInput("VARIANT_GROUP");
 	const variantField = block.getField("VARIANT");
@@ -319,7 +326,7 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
 	const resolvedField = block.getField("RESOLVED");
 	if (resolvedField) {
 		const preset = resolvedId ? presetsById.get(resolvedId) : null;
-		const missing = !moodBlock ? "add a mood" : !subjectBlock ? "add a subject" : "no such ending in the catalog";
+		const missing = !mood && !moodBlock ? "choose a mood" : !subjectValue ? "choose a subject" : "no such ending in the catalog";
 		resolvedField.setValue(preset ? labelFor(preset, getDisplayOptions()) : `(${missing})`);
 	}
 	// init()'s own initial call runs before initSvg()/render() ever have --
@@ -344,7 +351,7 @@ function resolveVerbPicker(block, verbEndingIndex, presetsById, getDisplayOption
  * @param {(person: number, number: string) => string} resolvePersonLabel oq's public-api export.
  */
 export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDisplayOptions, resolveMoodLabel, resolvePersonLabel) {
-	const { moodOptions, subjectOptions } = verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel);
+	const { moodOptions, subjectOptions, polarityOptions, polarityMapping } = verbEndingPickerFields(verbEndingIndex, resolveMoodLabel, resolvePersonLabel);
 
 	function onVariantChange(newValue) {
 		const block = this.getSourceBlock();
@@ -378,13 +385,11 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 		init() {
 			this.verbPickerState = { candidateOptions: [["—", "NONE"]] };
 
-			this.appendDummyInput().appendField("Verb ending");
-			this.appendValueInput("MOOD_SLOT")
-				.setCheck(VERB_MOOD_CONNECTION_TYPE)
-				.appendField("mood");
-			this.appendValueInput("SUBJECT_SLOT")
-				.setCheck(VERB_SUBJECT_CONNECTION_TYPE)
-				.appendField("subject");
+			this.appendDummyInput("CONFIG")
+				.appendField("Verb ending")
+				.appendField(new Blockly.FieldDropdown(moodOptions), "MOOD")
+				.appendField(new FieldDependentDropdown("MOOD", polarityMapping, polarityOptions), "POLARITY")
+				.appendField(new Blockly.FieldDropdown(subjectOptions), "SUBJECT");
 			this.appendValueInput("OBJECT_SLOT")
 				.setCheck(VERB_OBJECT_CONNECTION_TYPE)
 				.appendField("object (optional)");
@@ -407,7 +412,7 @@ export function defineVerbEndingPickerBlock(verbEndingIndex, presetsById, getDis
 			this.setPreviousStatement(true, CONNECTION_TYPE);
 			this.setNextStatement(true, CONNECTION_TYPE);
 			this.setStyle(INFLECTION_BLOCK_STYLE);
-			this.setInputsInline(false);
+			this.setInputsInline(true);
 			resolveVerbPicker(this, verbEndingIndex, presetsById, getDisplayOptions);
 		},
 	};
@@ -440,8 +445,8 @@ export function defineVerbObjectBlock(verbEndingIndex, resolvePersonLabel) {
 }
 
 /**
- * Wires reactivity for plugging/unplugging any selector block and editing a
- * connected selector's dropdown. All of those changes need to
+ * Wires reactivity for plugging/unplugging the object block and editing its
+ * dropdown. Those changes need to
  * re-resolve the OWNING picker -- not just whichever block's event actually
  * fired. VARIANT remains a field on the parent with its own validator. One workspace-
  * level listener, not one per block, since a picker block doesn't exist yet
@@ -470,8 +475,7 @@ export function registerVerbPickerReactivity(workspace) {
 		resolveAll();
 	});
 	// Serialization loads with Blockly events suppressed. Resolve once when
-	// registering so a rebuilt workspace does not retain the picker's null
-	// init state despite having restored selector blocks connected already.
+	// registering so a rebuilt workspace does not retain a stale picker state.
 	resolveAll();
 }
 
@@ -494,9 +498,9 @@ function comboKey(person, number) {
 }
 
 /**
- * Populates a freshly-created verb ending picker with matching mood and
- * subject blocks (plus an object block for a transitive ending) for a specific
- * real morpheme id -- mood, subject, object, and (when `preset.id` is one
+ * Populates a freshly-created verb ending picker with matching mood, polarity,
+ * and subject fields (plus an object block for a transitive ending) for a specific
+ * real morpheme id -- mood, subject, polarity, object, and (when `preset.id` is one
  * of the ~23 that share paradigm coordinates with another ending) the right
  * VARIANT -- so the block stays as adjustable as if it had been dragged
  * fresh from the toolbox, rather than a frozen, non-interactive stand-in
@@ -507,17 +511,9 @@ function comboKey(person, number) {
  */
 function restoreVerbPickerFields(workspace, block, preset) {
 	const inflection = preset.seq[0].inflection;
-	const moodBlock = workspace.newBlock(VERB_MOOD_TYPE);
-	moodBlock.initSvg();
-	moodBlock.render();
-	moodBlock.setFieldValue(inflection.mood, "MOOD");
-	block.getInput("MOOD_SLOT").connection.connect(moodBlock.outputConnection);
-
-	const subjectBlock = workspace.newBlock(VERB_SUBJECT_TYPE);
-	subjectBlock.initSvg();
-	subjectBlock.render();
-	subjectBlock.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "COMBO");
-	block.getInput("SUBJECT_SLOT").connection.connect(subjectBlock.outputConnection);
+	block.setFieldValue(inflection.mood, "MOOD");
+	block.setFieldValue(comboKey(inflection.subject.person, inflection.subject.number), "SUBJECT");
+	block.setFieldValue(inflection.polarity ?? "positive", "POLARITY");
 	if (inflection.object) {
 		const objectBlock = workspace.newBlock(VERB_OBJECT_TYPE);
 		objectBlock.initSvg();
@@ -593,23 +589,11 @@ export function buildToolbox(presets, displayOptions = {}, { includeVerbPicker =
 					fields: { LABEL: labelFor(preset, displayOptions) },
 				}));
 			if (name === "Inflectional endings" && includeVerbPicker) {
-				// Mood and subject arrive as replaceable shadow defaults: dragging
-				// the parent from the palette yields a working ending immediately,
-				// while the three typed selector blocks directly below it make the
-				// composition model visible and easy to alter.
-				blocks.unshift(
-					{
-						kind: "block",
-						type: VERB_ENDING_PICKER_TYPE,
-						inputs: {
-							MOOD_SLOT: { shadow: { type: VERB_MOOD_TYPE } },
-							SUBJECT_SLOT: { shadow: { type: VERB_SUBJECT_TYPE } },
-						},
-					},
-					{ kind: "block", type: VERB_MOOD_TYPE },
-					{ kind: "block", type: VERB_SUBJECT_TYPE },
-					{ kind: "block", type: VERB_OBJECT_TYPE },
-				);
+				// Mood, polarity, and subject are fields on the ending itself:
+				// they jointly select one API realization and have no independent
+				// meaning elsewhere in the current word builder. Object remains
+				// a separate typed block because its presence changes valency.
+				blocks.unshift({ kind: "block", type: VERB_ENDING_PICKER_TYPE });
 			}
 			return {
 				kind: "category",

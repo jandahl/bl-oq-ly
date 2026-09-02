@@ -56,6 +56,20 @@ test("buildVerbEndingIndex: two real endings sharing identical paradigm coordina
 	assert.deepEqual(new Set(found.map((c) => c.id)), new Set(["V_CONT_INTR_1SG", "V_CONTNEG_1SG"]));
 });
 
+test("buildVerbEndingIndex: polarity is a real coordinate and negative endings do not replace affirmative endings", () => {
+	const presets = [
+		verbEndingPreset("V_CONT_INTR_1SG", "contemporative", "intransitive", { person: 1, number: "sg" }, undefined, "while I V"),
+		{
+			...verbEndingPreset("V_CONTNEG_1SG", "contemporative", "intransitive", { person: 1, number: "sg" }, undefined, "while I do not V"),
+			seq: [{ inflection: { mood: "contemporative", transitivity: "intransitive", subject: { person: 1, number: "sg" }, polarity: "negative" } }],
+		},
+	];
+	const index = buildVerbEndingIndex(presets);
+	assert.equal(candidatesFor(index, "contemporative", "intransitive", 1, "sg", undefined, undefined, "positive")[0].id, "V_CONT_INTR_1SG");
+	assert.equal(candidatesFor(index, "contemporative", "intransitive", 1, "sg", undefined, undefined, "negative")[0].id, "V_CONTNEG_1SG");
+	assert.deepEqual(index.polaritiesByMood.get("contemporative"), ["positive", "negative"]);
+});
+
 test("candidatesFor: an unknown combination returns an empty array, never throws or returns undefined", () => {
 	const index = buildVerbEndingIndex([]);
 	assert.deepEqual(candidatesFor(index, "indicative", "intransitive", 1, "sg"), []);
@@ -98,4 +112,3 @@ test("personNumberLabel: splits the combo and forwards to the injected resolvePe
 	assert.equal(personNumberLabel("3|sg", fakeResolvePersonLabel), "3SG");
 	assert.equal(personNumberLabel("1|pl", fakeResolvePersonLabel), "1PL");
 });
-
