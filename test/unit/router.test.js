@@ -56,3 +56,28 @@ test("writeState: a word containing characters that need percent-encoding (e.g. 
 	const state = { mode: "deconstruct", word: "qimmeq arpunga", chain: [] };
 	assert.deepEqual(readState(writeState(state)), state);
 });
+
+test("writeState keeps both word and chain so tab switches do not drop the other tab", () => {
+	const qs = writeState({
+		mode: "deconstruct",
+		word: "qimmeqarpunga",
+		chain: ["qimmeq", "N_qaq_Vb"],
+	});
+	assert.equal(qs.includes("mode=deconstruct"), true);
+	assert.equal(qs.includes("word=qimmeqarpunga"), true);
+	assert.equal(qs.includes("chain="), true);
+	assert.deepEqual(readState(qs), {
+		mode: "deconstruct",
+		word: "qimmeqarpunga",
+		chain: ["qimmeq", "N_qaq_Vb"],
+	});
+});
+
+test("writeState/readState round-trip with both tabs populated", () => {
+	const state = {
+		mode: "build",
+		word: "qimmeq",
+		chain: ["qimmeq", "N_qaq_Vb", "V_IND_INTR_1SG"],
+	};
+	assert.deepEqual(readState(writeState(state)), state);
+});

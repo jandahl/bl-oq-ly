@@ -268,15 +268,19 @@ function setStatus(text, kind, meta) {
 	}
 }
 
-// --- Shareable-link state (router.js). Build's link stays in sync with the
-// on-canvas chain on every change (replaceState -- too frequent for real
-// browser history entries); mode switches and a successful Deconstruct both
-// push a real history entry, since those are deliberate, share-worthy
-// moments a learner would reasonably want Back/Forward to step through.
+// --- Shareable-link state (router.js). Both tabs' content live in the URL
+// together -- Build's chain AND Deconstruct's word -- so switching tabs
+// never drops the other side. Build's canvas still replaceState-syncs on
+// every change (too frequent for real history entries); mode switches and
+// a successful Deconstruct push a real history entry.
 function currentShareState() {
-	if (mode === "deconstruct") return { mode, word: lastDeconstructWord, chain: [] };
 	const chains = workspace ? topLevelChains(workspace) : [];
-	return { mode, word: "", chain: chains.length === 1 ? chains[0] : [] };
+	const word = lastDeconstructWord || wordInput.value.trim();
+	return {
+		mode,
+		word,
+		chain: chains.length === 1 ? chains[0] : [],
+	};
 }
 
 function syncURL({ push = false } = {}) {
@@ -287,19 +291,28 @@ function syncURL({ push = false } = {}) {
 
 /** Applies a {mode, word, chain} state (from router.js's readState(),
  * whether from the initial load or a popstate) to the live app -- the
- * inverse of currentShareState(). Never itself touches the URL (the caller
- * already has it, or is about to set it) so this can't cause a redundant
- * history entry or clobber a state we're in the middle of restoring FROM. */
+ * inverse of currentShareState(). Restores BOTH tabs, then shows the one
+ * `mode` names, so a round-trip through the other tab cannot blank the
+ * one you left. Never itself touches the URL (the caller already has it,
+ * or is about to set it). */
 function applyShareState(state) {
-	setMode(state.mode, { sync: false });
-	if (state.mode === "deconstruct") {
-		if (state.word) {
-			wordInput.value = state.word;
-			runDeconstruct();
+	if (state.word) {
+		wordInput.value = state.word;
+		if (!lastDeconstructWord) lastDeconstructWord = state.word;
+	}
+	if (state.chain.length > 0 && workspace) {
+		const current = topLevelChains(workspace);
+		const same = current.length === 1 && current[0].length === state.chain.length
+			&& current[0].every((id, i) => id === state.chain[i]);
+		if (!same) {
+			renderChain(workspace, state.chain, presetsById, displayOptions());
+			workspace.scrollCenter();
 		}
-	} else if (state.chain.length > 0) {
-		renderChain(workspace, state.chain, presetsById, displayOptions());
-		workspace.scrollCenter();
+	}
+	setMode(state.mode, { sync: false });
+	if (state.mode === "deconstruct" && state.word) {
+		if (lastDeconstructWord !== state.word || !lastDeconstructSeq) runDeconstruct();
+	} else if (state.mode === "build") {
 		refreshBuild();
 	}
 }
@@ -376,20 +389,25 @@ async function runDeconstruct() {
 	const run = ++deconstructRun;
 	if (!word) return;
 	deconstructAbort = new AbortController();
-	breakdownDiv.innerHTML = "";
-	moveToBuilderBtn.hidden = true;
+	if (mode === "deconstruct") {
+		breakdownDiv.innerHTML = "";
+		moveToBuilderBtn.hidden = true;
+		setStatus(`Analyzing "${word}"…`, "");
+	}
 	lastDeconstructIds = null;
 	lastDeconstructSeq = null;
 	lastDeconstructAlternatives = null;
-	setStatus(`Analyzing "${word}"…`, "");
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
 		// AbortController is advisory: an upstream implementation may still
 		// resolve after abort. Never let that stale result replace a newer
-		// analysis (or one started before the user switched modes).
+		// analysis. A completed result IS stored even if the learner switched
+		// to Build mid-flight, so returning to Deconstruct still has it.
 		if (run !== deconstructRun) return;
 		if (!result.matches || result.matches.length === 0) {
-			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
+			if (mode === "deconstruct") {
+				setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
+			}
 			return;
 		}
 		const analyzed = result.matches.map((match) => ({ seq: match.seq, built: buildWord(match.seq) }));
@@ -398,17 +416,22 @@ async function runDeconstruct() {
 		lastDeconstructSeq = best.seq;
 		lastDeconstructBuilt = best.built;
 		lastDeconstructAlternatives = analyzed.slice(1);
-		rerenderBreakdown();
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
-		moveToBuilderBtn.hidden = false;
-		statusEl.hidden = true;
-		// A verified result is the share-worthy moment -- not every keystroke,
-		// and not a failed/no-match attempt (see currentShareState()'s use of
-		// lastDeconstructWord rather than the live input value).
-		syncURL({ push: true });
+		if (mode === "deconstruct") {
+			rerenderBreakdown();
+			moveToBuilderBtn.hidden = false;
+			statusEl.hidden = true;
+			saveDeconstructStatus();
+			// A verified result is the share-worthy moment -- not every keystroke,
+			// and not a failed/no-match attempt (see currentShareState()'s use of
+			// lastDeconstructWord rather than the live input value).
+			syncURL({ push: true });
+		} else {
+			syncURL({ push: false });
+		}
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== deconstructRun) return;
-		setStatus(`Analysis failed: ${err.message}`, "error");
+		if (mode === "deconstruct") setStatus(`Analysis failed: ${err.message}`, "error");
 	}
 }
 
@@ -454,15 +477,46 @@ function applyToolbox() {
 	closeOpenFlyout();
 }
 
-function setMode(next, { sync = true } = {}) {
-	// Invalidate any in-flight analysis before changing what is visible. This
-	// protects the Build view from a late Deconstruct response even when the
-	// API does not observe AbortController promptly.
-	deconstructRun++;
-	if (deconstructAbort) {
-		deconstructAbort.abort();
-		deconstructAbort = null;
+let savedDeconstructStatus = null;
+
+function saveDeconstructStatus() {
+	savedDeconstructStatus = {
+		hidden: statusEl.hidden,
+		text: statusLine.textContent,
+		kind: statusEl.className,
+		meta: statusEl.querySelector(".meta")?.textContent ?? null,
+	};
+}
+
+function restoreDeconstructStatus() {
+	if (!savedDeconstructStatus) {
+		setStatus("Type a word and press Deconstruct.", "");
+		return;
 	}
+	if (savedDeconstructStatus.hidden) {
+		statusEl.hidden = true;
+		return;
+	}
+	setStatus(savedDeconstructStatus.text, savedDeconstructStatus.kind, savedDeconstructStatus.meta);
+}
+
+function setMode(next, { sync = true } = {}) {
+	// Clicking the already-selected tab is a no-op. Previously this path still
+	// ran the Deconstruct-entry reset below, so a second click on Deconstruct
+	// wiped a finished analysis.
+	if (mode === next) return;
+
+	// Do not abort or invalidate an in-flight analysis just for leaving the
+	// tab -- a result that finishes while Build is showing is stored and
+	// waiting when the learner comes back. closeOpenFlyout only, so a
+	// leftover toolbox overlay doesn't sit on Deconstruct.
+	if (mode === "build" && next !== "build") {
+		closeOpenFlyout();
+	}
+	if (mode === "deconstruct") {
+		saveDeconstructStatus();
+	}
+
 	mode = next;
 	modeBuildBtn.classList.toggle("active", next === "build");
 	modeBuildBtn.setAttribute("aria-selected", String(next === "build"));
@@ -476,19 +530,19 @@ function setMode(next, { sync = true } = {}) {
 	if (next === "build") {
 		requestAnimationFrame(() => Blockly.svgResize(workspace));
 		refreshBuild();
+	} else if (lastDeconstructSeq) {
+		// Restore the last verified breakdown instead of blanking the tab.
+		// The DOM is left intact across switches; this only un-hides it and
+		// puts the status line back the way a completed analysis left it.
+		if (lastDeconstructWord) wordInput.value = lastDeconstructWord;
+		moveToBuilderBtn.hidden = !lastDeconstructIds;
+		updateReadingLine(null);
+		if (!breakdownDiv.innerHTML) rerenderBreakdown();
+		statusEl.hidden = true;
 	} else {
-		breakdownDiv.innerHTML = "";
 		moveToBuilderBtn.hidden = true;
 		updateReadingLine(null);
-		setStatus("Type a word and press Deconstruct.", "");
-		// Cleared here (not just visually blanked) so currentShareState()
-		// never links to a stale previous result the UI no longer shows --
-		// applyShareState() repopulates these immediately via runDeconstruct()
-		// when the state being restored actually carries a word.
-		lastDeconstructIds = null;
-		lastDeconstructSeq = null;
-		lastDeconstructAlternatives = null;
-		lastDeconstructWord = "";
+		restoreDeconstructStatus();
 	}
 	// sync:false when applyShareState() is driving this (initial load or a
 	// popstate) -- the URL either already matches (we just navigated there)
