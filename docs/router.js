@@ -3,6 +3,13 @@
 // can copy the address bar and hand someone else the exact same view:
 // "look at this word", "look at how I built this".
 //
+// Both `word` and `chain` are kept when present, even if they belong to the
+// inactive tab. Dropping the other tab's param on a mode switch is what made
+// Build's stack (or Deconstruct's analysis) vanish the moment you clicked
+// the other tab and came back — the URL forgot it, and a restore had
+// nothing to put back. A link may therefore carry both; the active `mode`
+// still decides which view is showing.
+//
 // Deliberately NOT included: theme, language, spelling mode, show-ids,
 // reading order (app.js's own localStorage-backed *_KEY constants). Those
 // are "how I like to see things," not "what I'm looking at" -- baking a
@@ -41,10 +48,8 @@ export function readState(search) {
  * Builds the query string (leading "?", or "" for entirely-default/empty
  * state) for {mode, word, chain}. Omits a param at its default/empty value
  * so an untouched app still links to a bare path, not a query string full
- * of defaults -- and so switching mode doesn't leave the OTHER mode's own
- * param (a stale `word` while in build mode, a stale `chain` while in
- * deconstruct mode) sitting in the URL; callers pass only the field(s)
- * relevant to the current mode (see app.js's `currentShareState()`).
+ * of defaults. Both `word` and `chain` are emitted when set, regardless of
+ * `mode`, so switching tabs does not drop the other tab's content.
  * @param {{ mode?: string, word?: string, chain?: string[] }} state
  * @returns {string}
  */

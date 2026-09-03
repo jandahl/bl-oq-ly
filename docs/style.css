@@ -111,6 +111,7 @@ main {
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
+	position: relative;
 }
 
 .panel { display: none; }
@@ -196,7 +197,16 @@ main {
 	border: 1px solid var(--border);
 	border-radius: 6px;
 }
-#blockly-div[hidden] { display: none; }
+#blockly-div[hidden] {
+	/* Keep the workspace measured while Build is inactive so switching
+	   back doesn't flash an empty 0×0 canvas. Taken out of flow (no gap)
+	   rather than display:none, which zeros Blockly's metrics. */
+	display: block !important;
+	position: absolute;
+	visibility: hidden;
+	pointer-events: none;
+	z-index: -1;
+}
 
 /* bl-oq-ly#20: on a phone-width viewport, Blockly's own toolbox tree sizes
    itself to its longest category label ("Derivational affixes (576)") --
