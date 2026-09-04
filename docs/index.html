@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<title>bl-oq-ly</title>
 	<link rel="stylesheet" href="./style.css" />
 </head>
@@ -10,7 +10,10 @@
 	<header>
 		<div class="header-top">
 			<h1>bl-oq-ly</h1>
-			<button id="theme-toggle" class="theme-toggle" type="button">Theme: Auto</button>
+			<div class="header-actions">
+				<button id="theme-toggle" class="theme-toggle" type="button">Theme: Auto</button>
+				<button id="display-toggle" class="theme-toggle" type="button" aria-controls="display-panel" aria-expanded="true">Display</button>
+			</div>
 		</div>
 		<p class="subtitle">A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
@@ -21,7 +24,7 @@
 			</div>
 			<button id="analyze-btn" type="submit">Deconstruct</button>
 		</form>
-		<div class="view-options">
+		<div class="view-options" id="display-panel">
 			<label><input type="checkbox" id="opt-reading-order" checked /> Read last morpheme first</label>
 			<div class="option-cluster">
 				<span id="opt-lang-label">Gloss language</span>
@@ -36,6 +39,13 @@
 					<button type="button" role="radio" data-value="both" aria-checked="true">Form + gloss</button>
 					<button type="button" role="radio" data-value="spelling-only" aria-checked="false">Form only</button>
 					<button type="button" role="radio" data-value="gloss-only" aria-checked="false">Gloss only</button>
+				</div>
+			</div>
+			<div class="option-cluster">
+				<span id="blockly-theme-label">Block style</span>
+				<div id="blockly-theme-select" class="segmented" role="radiogroup" aria-labelledby="blockly-theme-label">
+					<button type="button" role="radio" data-value="classic" aria-checked="true">Classic</button>
+					<button type="button" role="radio" data-value="zelos" aria-checked="false">Zelos</button>
 				</div>
 			</div>
 			<label><input type="checkbox" id="opt-show-ids" /> Add internal API ids</label>
@@ -53,13 +63,6 @@
 			<div class="clearable" id="morpheme-filter-wrap">
 				<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
 				<button type="button" class="clear-field" id="morpheme-filter-clear" hidden aria-label="Clear filter">×</button>
-			</div>
-			<div class="option-cluster">
-				<span id="blockly-theme-label">Block style</span>
-				<div id="blockly-theme-select" class="segmented" role="radiogroup" aria-labelledby="blockly-theme-label">
-					<button type="button" role="radio" data-value="classic" aria-checked="true">Classic</button>
-					<button type="button" role="radio" data-value="zelos" aria-checked="false">Zelos</button>
-				</div>
 			</div>
 		</div>
 
