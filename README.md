@@ -9,7 +9,8 @@ is a standalone static site, reachable only by its own direct URL.
 
 ## What it does
 
-One page, two modes:
+One page, one workshop. Deconstruct lives in the header; a successful
+analysis instantly drops the verified chain onto the Build canvas.
 
 - **Build**: drag morpheme blocks from a categorized Blockly toolbox (Stems
   — nouns, Stems — verbs, Derivational affixes, Inflectional endings,
@@ -47,12 +48,13 @@ One page, two modes:
   never surfaced this — a bug in how this repo used the API, not a gap in
   oq's public surface (`gloss.js`'s `composedTranslation()`, shared with
   Build's own reading line below — an identical bug existed there too until
-  it was pointed out). A **"Move to Word Builder"** button (shown once a
-  breakdown renders) switches to
-  Build mode and recreates the verified chain as a live, editable block
-  stack (`blocks.js`'s `renderChain()`) so the learner can keep
-  experimenting from a known-good starting point instead of rebuilding it
-  by hand.
+  it was pointed out). There is no separate "Move to Word Builder" step:
+  a successful analysis instantly recreates the verified chain as a live,
+  editable block stack (`blocks.js`'s `renderChain()`) so the learner can
+  keep experimenting from a known-good starting point instead of rebuilding
+  it by hand. The per-morpheme breakdown sits in a collapsing `<details>`
+  panel (`#breakdown-details`) rather than a second tab — open to read the
+  analysis, collapsed to give the canvas room.
 
 Blockly's previous/next statement connections do the stack-shape enforcement
 for free — a morpheme chain is linear and order-strict (stem first, a
@@ -84,7 +86,7 @@ canonical hierarchy palette as oq instead of locally invented hues.
 
 ### Display options
 
-The display controls under the mode toggle are persisted:
+The display controls under the deconstruct form are persisted:
 
 - **"Read last morpheme first"** (default on). Reverses Deconstruct's
   per-morpheme rows so a European reader's own translation direction reads
@@ -144,16 +146,18 @@ screen, so copying it hands someone else the exact same view:
 - **Build**: the on-canvas chain — `?chain=qimmeq,N_qaq_Vb,V_IND_INTR_1SG`.
   Kept live via `history.replaceState` on every canvas change (no history
   spam from every drag).
-- **Deconstruct**: the analyzed word, once a verified breakdown is found —
-  `?mode=deconstruct&word=qimmeqarpunga`. Pushed via `history.pushState`
-  (a real, Back/Forward-navigable moment), not on every keystroke or a
-  failed/no-match attempt.
-- Switching mode also pushes a history entry, so Back/Forward steps through
-  mode switches the way a learner would expect.
+- **Deconstruct**: the analyzed word, once a verified breakdown is found,
+  together with the chain dropped onto the canvas —
+  `?mode=deconstruct&word=qimmeqarpunga&chain=qimmeq,N_qaq_Vb,V_IND_INTR_1SG`.
+  Pushed via `history.pushState` (a real, Back/Forward-navigable moment),
+  not on every keystroke or a failed/no-match attempt. Older
+  `?mode=deconstruct&word=…` links still restore: the analysis re-runs and
+  the chain is populated automatically.
 
 Loading either kind of link restores it automatically: a `chain` link
-rebuilds the same stack via `renderChain()`; a `mode=deconstruct&word=...`
-link re-runs the analysis. A bare `/` (nothing to restore) is left alone
+rebuilds the same stack via `renderChain()`; a `word=…` link re-runs the
+analysis and (unless a chain is already in the URL) drops it on the canvas.
+A bare `/` (nothing to restore) is left alone
 entirely, so the ordinary "Loaded N morphemes" startup message isn't
 immediately overwritten by Build's own empty-canvas status.
 
@@ -217,8 +221,8 @@ module that imports `oq-api.js`'s live, network-backed re-export of oq's
 public API) rather than imported directly by `verb-endings.js`/`blocks.js`,
 so those two stay plain, dependency-free and unit-testable under Node.
 
-A verb ending block placed on the canvas any other way -- Deconstruct's
-"Move to Word Builder," or restoring a shared `?chain=...` link -- is a real
+A verb ending block placed on the canvas any other way -- Deconstruct
+auto-populating the canvas, or restoring a shared `?chain=...` link -- is a real
 picker instance too, with mood/polarity/subject fields set to match that
 exact id, an object block connected for a transitive ending, and the variant
 dropdown set when the complete coordinate is ambiguous -- not a frozen label
@@ -350,7 +354,7 @@ on every push and PR.
   caching/offline support yet.
 - Deconstruct foregrounds the top-ranked verified breakdown and keeps any
   lower-ranked verified breakdowns folded below it, each with its own link
-  back to the Word Builder.
+  that loads that alternative chain onto the canvas.
 - Not a substitute for oq's own Word Builder / Deconstruct views — this is a
   separate, more playful presentation of the same underlying engine, for
   exploring the idea of a block-based teaching tool.

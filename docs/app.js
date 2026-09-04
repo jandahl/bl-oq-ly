@@ -13,19 +13,16 @@ import { loadWorkedExamples } from "./worked-examples.js";
 
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
-const modeBuildBtn = document.getElementById("mode-build");
-const modeDeconstructBtn = document.getElementById("mode-deconstruct");
-const panelBuild = document.getElementById("panel-build");
-const panelDeconstruct = document.getElementById("panel-deconstruct");
 const wordInput = document.getElementById("word-input");
-const analyzeBtn = document.getElementById("analyze-btn");
+const deconstructForm = document.getElementById("deconstruct-form");
 const blocklyDiv = document.getElementById("blockly-div");
 const breakdownDiv = document.getElementById("breakdown");
+const breakdownDetails = document.getElementById("breakdown-details");
+const breakdownSummary = document.getElementById("breakdown-summary");
 const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterInput = document.getElementById("morpheme-filter");
 const blocklyThemeSelect = document.getElementById("blockly-theme-select");
-const moveToBuilderBtn = document.getElementById("move-to-builder-btn");
 const exampleWordButtons = document.querySelectorAll("[data-example-word]");
 const workedExamplesBtn = document.getElementById("worked-examples-btn");
 const workedExamplesModal = document.getElementById("worked-examples-modal");
@@ -45,7 +42,7 @@ let presetsById = new Map();
 let workspace = null;
 let deconstructAbort = null;
 let deconstructRun = 0;
-let paletteVisible = true;
+let paletteVisible = window.innerWidth >= 640;
 let lastDeconstructIds = null;
 let blocklyThemes = null;
 let lastDeconstructWord = "";
@@ -72,7 +69,6 @@ function displayOptions() {
 }
 
 function selectExample(word) {
-	setMode("deconstruct");
 	wordInput.value = word;
 	runDeconstruct();
 }
@@ -268,11 +264,12 @@ function setStatus(text, kind, meta) {
 	}
 }
 
-// --- Shareable-link state (router.js). Both tabs' content live in the URL
-// together -- Build's chain AND Deconstruct's word -- so switching tabs
-// never drops the other side. Build's canvas still replaceState-syncs on
-// every change (too frequent for real history entries); mode switches and
-// a successful Deconstruct push a real history entry.
+// --- Shareable-link state (router.js). The URL carries both the canvas
+// chain and the analyzed word together so a copy of the address bar
+// restores the same workshop view. Build's canvas still replaceState-syncs
+// on every change (too frequent for real history entries); a successful
+// Deconstruct pushes a real history entry. `mode` is still written for
+// older `?mode=deconstruct&word=…` links; there is no tab UI anymore.
 function currentShareState() {
 	const chains = workspace ? topLevelChains(workspace) : [];
 	const word = lastDeconstructWord || wordInput.value.trim();
@@ -291,10 +288,10 @@ function syncURL({ push = false } = {}) {
 
 /** Applies a {mode, word, chain} state (from router.js's readState(),
  * whether from the initial load or a popstate) to the live app -- the
- * inverse of currentShareState(). Restores BOTH tabs, then shows the one
- * `mode` names, so a round-trip through the other tab cannot blank the
- * one you left. Never itself touches the URL (the caller already has it,
- * or is about to set it). */
+ * inverse of currentShareState(). Restores the canvas chain and the
+ * analyzed word together; `mode` is accepted for older links but no
+ * longer switches a hidden panel. Never itself touches the URL (the
+ * caller already has it, or is about to set it). */
 function applyShareState(state) {
 	if (state.word) {
 		wordInput.value = state.word;
@@ -308,12 +305,14 @@ function applyShareState(state) {
 			renderChain(workspace, state.chain, presetsById, displayOptions());
 			workspace.scrollCenter();
 		}
-	}
-	setMode(state.mode, { sync: false });
-	if (state.mode === "deconstruct" && state.word) {
-		if (lastDeconstructWord !== state.word || !lastDeconstructSeq) runDeconstruct();
-	} else if (state.mode === "build") {
 		refreshBuild();
+	}
+	if (state.word) {
+		if (lastDeconstructWord !== state.word || !lastDeconstructSeq) {
+			runDeconstruct({ skipCanvas: state.chain.length > 0 });
+		} else {
+			rerenderBreakdown();
+		}
 	}
 }
 
@@ -328,7 +327,7 @@ function seqForChain(ids) {
 }
 
 function refreshBuild() {
-	if (mode !== "build" || !workspace) return;
+	if (!workspace) return;
 	// Keeps Build's link current with the canvas on every change -- cheap
 	// (replaceState, no history entry) and correct regardless of which
 	// early-return below fires, since the chain itself is already final by
@@ -379,35 +378,34 @@ function rerenderBreakdown() {
 		word: lastDeconstructWord,
 		reverseOrder: readLastFirst(),
 		lang: displayOptions().lang,
-		builderHref: (seq) => `${location.pathname}${writeState({ mode: "build", chain: seq.map((item) => item.id).filter(Boolean) })}`,
+		builderHref: (seq) => `${location.pathname}${writeState({ chain: seq.map((item) => item.id).filter(Boolean) })}`,
 	});
+	const n = primary.querySelectorAll(".breakdown-row").length;
+	const translation = primary.querySelector(".breakdown-translation")?.textContent;
+	breakdownSummary.textContent = translation
+		? `Morpheme chain · ${n} · ${translation}`
+		: `Morpheme chain · ${n}`;
+	breakdownDetails.hidden = false;
+	breakdownDetails.open = window.innerWidth >= 640;
 }
 
-async function runDeconstruct() {
+async function runDeconstruct({ skipCanvas = false } = {}) {
 	const word = wordInput.value.trim();
 	if (deconstructAbort) deconstructAbort.abort();
 	const run = ++deconstructRun;
 	if (!word) return;
 	deconstructAbort = new AbortController();
-	if (mode === "deconstruct") {
-		breakdownDiv.innerHTML = "";
-		moveToBuilderBtn.hidden = true;
-		setStatus(`Analyzing "${word}"…`, "");
-	}
+	breakdownDiv.innerHTML = "";
+	breakdownDetails.hidden = true;
+	setStatus(`Analyzing "${word}"…`, "");
 	lastDeconstructIds = null;
 	lastDeconstructSeq = null;
 	lastDeconstructAlternatives = null;
 	try {
 		const result = await analyzeWordAsync(word, presets, {}, { signal: deconstructAbort.signal });
-		// AbortController is advisory: an upstream implementation may still
-		// resolve after abort. Never let that stale result replace a newer
-		// analysis. A completed result IS stored even if the learner switched
-		// to Build mid-flight, so returning to Deconstruct still has it.
 		if (run !== deconstructRun) return;
 		if (!result.matches || result.matches.length === 0) {
-			if (mode === "deconstruct") {
-				setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
-			}
+			setStatus(`No verified breakdown found for "${word}".`, "error", `${result.evalCount} candidates checked`);
 			return;
 		}
 		const analyzed = result.matches.map((match) => ({ seq: match.seq, built: buildWord(match.seq) }));
@@ -417,32 +415,19 @@ async function runDeconstruct() {
 		lastDeconstructBuilt = best.built;
 		lastDeconstructAlternatives = analyzed.slice(1);
 		lastDeconstructIds = best.seq.map((item) => item.id).filter(Boolean);
-		if (mode === "deconstruct") {
-			rerenderBreakdown();
-			moveToBuilderBtn.hidden = false;
-			statusEl.hidden = true;
-			saveDeconstructStatus();
-			// A verified result is the share-worthy moment -- not every keystroke,
-			// and not a failed/no-match attempt (see currentShareState()'s use of
-			// lastDeconstructWord rather than the live input value).
-			syncURL({ push: true });
-		} else {
-			syncURL({ push: false });
+		mode = "deconstruct";
+		rerenderBreakdown();
+		if (!skipCanvas && lastDeconstructIds.length && workspace) {
+			renderChain(workspace, lastDeconstructIds, presetsById, displayOptions());
+			workspace.scrollCenter();
+			requestAnimationFrame(() => Blockly.svgResize(workspace));
+			refreshBuild();
 		}
+		syncURL({ push: true });
 	} catch (err) {
 		if (err?.name === "AbortError" || run !== deconstructRun) return;
-		if (mode === "deconstruct") setStatus(`Analysis failed: ${err.message}`, "error");
+		setStatus(`Analysis failed: ${err.message}`, "error");
 	}
-}
-
-function moveToBuilder() {
-	if (!lastDeconstructIds) return;
-	const ids = lastDeconstructIds;
-	setMode("build");
-	Blockly.svgResize(workspace);
-	renderChain(workspace, ids, presetsById, displayOptions());
-	workspace.scrollCenter(); // the toolbox otherwise covers a stack placed at the workspace's default (20, 20) origin
-	refreshBuild();
 }
 
 // --- Palette hide/show (bl-oq-ly#8) and filter (bl-oq-ly#9). The toolbox
@@ -477,81 +462,6 @@ function applyToolbox() {
 	closeOpenFlyout();
 }
 
-let savedDeconstructStatus = null;
-
-function saveDeconstructStatus() {
-	savedDeconstructStatus = {
-		hidden: statusEl.hidden,
-		text: statusLine.textContent,
-		kind: statusEl.className,
-		meta: statusEl.querySelector(".meta")?.textContent ?? null,
-	};
-}
-
-function restoreDeconstructStatus() {
-	if (!savedDeconstructStatus) {
-		setStatus("Type a word and press Deconstruct.", "");
-		return;
-	}
-	if (savedDeconstructStatus.hidden) {
-		statusEl.hidden = true;
-		return;
-	}
-	setStatus(savedDeconstructStatus.text, savedDeconstructStatus.kind, savedDeconstructStatus.meta);
-}
-
-function setMode(next, { sync = true } = {}) {
-	// Clicking the already-selected tab is a no-op. Previously this path still
-	// ran the Deconstruct-entry reset below, so a second click on Deconstruct
-	// wiped a finished analysis.
-	if (mode === next) return;
-
-	// Do not abort or invalidate an in-flight analysis just for leaving the
-	// tab -- a result that finishes while Build is showing is stored and
-	// waiting when the learner comes back. closeOpenFlyout only, so a
-	// leftover toolbox overlay doesn't sit on Deconstruct.
-	if (mode === "build" && next !== "build") {
-		closeOpenFlyout();
-	}
-	if (mode === "deconstruct") {
-		saveDeconstructStatus();
-	}
-
-	mode = next;
-	modeBuildBtn.classList.toggle("active", next === "build");
-	modeBuildBtn.setAttribute("aria-selected", String(next === "build"));
-	modeDeconstructBtn.classList.toggle("active", next === "deconstruct");
-	modeDeconstructBtn.setAttribute("aria-selected", String(next === "deconstruct"));
-	panelBuild.classList.toggle("active", next === "build");
-	panelDeconstruct.classList.toggle("active", next === "deconstruct");
-	blocklyDiv.hidden = next !== "build";
-	breakdownDiv.hidden = next !== "deconstruct";
-
-	if (next === "build") {
-		requestAnimationFrame(() => Blockly.svgResize(workspace));
-		refreshBuild();
-	} else if (lastDeconstructSeq) {
-		// Restore the last verified breakdown instead of blanking the tab.
-		// The DOM is left intact across switches; this only un-hides it and
-		// puts the status line back the way a completed analysis left it.
-		if (lastDeconstructWord) wordInput.value = lastDeconstructWord;
-		moveToBuilderBtn.hidden = !lastDeconstructIds;
-		updateReadingLine(null);
-		if (!breakdownDiv.innerHTML) rerenderBreakdown();
-		statusEl.hidden = true;
-	} else {
-		moveToBuilderBtn.hidden = true;
-		updateReadingLine(null);
-		restoreDeconstructStatus();
-	}
-	// sync:false when applyShareState() is driving this (initial load or a
-	// popstate) -- the URL either already matches (we just navigated there)
-	// or is about to be set by whatever applyShareState() does next
-	// (runDeconstruct()'s own syncURL(), or renderChain()+refreshBuild()'s),
-	// so pushing here too would create a redundant/premature history entry.
-	if (sync) syncURL({ push: true });
-}
-
 async function main() {
 	blocklyThemes = buildBlocklyThemes();
 	initTheme();
@@ -574,9 +484,16 @@ async function main() {
 	const authNote = catalog.authoritative === false ? " (grammarian data is hand-authored, not yet dictionary-verified — see its own CLAUDE.md)" : "";
 	setStatus(`Loaded ${presets.length} morphemes.${authNote}`, "");
 
-	modeBuildBtn.addEventListener("click", () => setMode("build"));
-	modeDeconstructBtn.addEventListener("click", () => setMode("deconstruct"));
-	analyzeBtn.addEventListener("click", runDeconstruct);
+	if (!paletteVisible) {
+		paletteToggleBtn.textContent = "Show palette";
+		filterInput.hidden = true;
+		applyToolbox();
+	}
+
+	deconstructForm.addEventListener("submit", (e) => {
+		e.preventDefault();
+		runDeconstruct();
+	});
 	for (const button of exampleWordButtons) {
 		button.addEventListener("click", () => selectExample(button.dataset.exampleWord));
 	}
@@ -589,10 +506,6 @@ async function main() {
 		workedExamplesModal.close();
 		selectExample(button.dataset.exampleWord);
 	});
-	wordInput.addEventListener("keydown", (e) => {
-		if (e.key === "Enter") runDeconstruct();
-	});
-	moveToBuilderBtn.addEventListener("click", moveToBuilder);
 
 	paletteToggleBtn.addEventListener("click", () => {
 		paletteVisible = !paletteVisible;
@@ -603,16 +516,8 @@ async function main() {
 	});
 	filterInput.addEventListener("input", applyToolbox);
 
-	// Shareable links (router.js): restore whatever the page was loaded with
-	// -- a bare "/" degrades to today's plain default (build mode, empty
-	// canvas), same as before this feature existed. Back/Forward then just
-	// replays the same restore against each history entry's own URL.
-	// A bare "/" (nothing to restore) is left alone entirely -- applyShareState
-	// would otherwise still run setMode("build")'s own refreshBuild(), which
-	// immediately overwrites the "Loaded N morphemes" confirmation above with
-	// "Drag a morpheme block in to begin." for no reason connected to a link.
 	const initialState = readState(location.search);
-	if (initialState.mode !== "build" || initialState.word || initialState.chain.length > 0) applyShareState(initialState);
+	if (initialState.word || initialState.chain.length > 0) applyShareState(initialState);
 	window.addEventListener("popstate", () => applyShareState(readState(location.search)));
 }
 

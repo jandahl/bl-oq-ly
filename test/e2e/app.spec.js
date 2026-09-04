@@ -322,11 +322,9 @@ test("Build: filtering the palette hides the verb ending picker entirely (bl-oq-
 
 test("Danish gloss language: block labels and Deconstruct's translation switch to Danish text (bl-oq-ly#17)", async ({ page }) => {
 	await page.selectOption("#opt-lang", "da");
-	await page.waitForTimeout(300);
-	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 	const translation = await page.textContent("#primary-breakdown .breakdown-translation");
 	expect(translation.toLowerCase()).toContain("hund"); // Danish for "dog"
 });
@@ -424,12 +422,9 @@ test("Build: Blockly theme dropdown switches to Zelos and persists the choice", 
 });
 
 test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morpheme breakdown, not a raw id list (bl-oq-ly#4/#16)", async ({ page }) => {
-	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
-
-	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 	// The single most important regression this suite exists to prevent:
 	// bl-oq-ly shipped " · "-joined per-morpheme fragments TWICE where oq's
 	// own Deconstruct shows one composed sentence.
@@ -446,10 +441,9 @@ test("Deconstruct: qimmeqarpunga produces the composed sentence AND the per-morp
 });
 
 test("Deconstruct: lower-ranked verified breakdowns are folded and link to their own builder chains", async ({ page }) => {
-	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden();
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 	const alternatives = page.locator("#alternative-breakdowns");
 	await expect(alternatives).toBeVisible();
 	await expect(alternatives).not.toHaveAttribute("open", "");
@@ -459,10 +453,9 @@ test("Deconstruct: lower-ranked verified breakdowns are folded and link to their
 });
 
 test("Deconstruct: reading-order toggle reverses the rows but never the composed translation (bl-oq-ly#11)", async ({ page }) => {
-	await page.click("#mode-deconstruct");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 
 	// "Read last morpheme first" defaults ON (index.html's #opt-reading-order
 	// starts checked), so the FIRST row on a fresh Deconstruct is already the
@@ -477,15 +470,11 @@ test("Deconstruct: reading-order toggle reverses the rows but never the composed
 	await expect(page.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog");
 });
 
-test("Deconstruct -> Move to Word Builder recreates the exact verified chain as connected, editable blocks (bl-oq-ly#8)", async ({ page }) => {
-	await page.click("#mode-deconstruct");
+test("Deconstruct instantly recreates the verified chain as connected, editable blocks", async ({ page }) => {
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
-	await page.click("#move-to-builder-btn");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 	await page.waitForTimeout(500);
-
-	await expect(page.locator("#mode-build")).toHaveClass(/active/);
 	const chain = await page.evaluate(() => {
 		const ws = Blockly.getMainWorkspace();
 		const tops = ws.getTopBlocks(true);
@@ -518,12 +507,10 @@ test("Deconstruct -> Move to Word Builder recreates the exact verified chain as 
 	expect(endingBlock).toEqual({ data: "V_IND_INTR_1SG", mood: "indicative", moodOptionCount: 9, polarity: "positive", subject: "1|sg" });
 });
 
-test("Build: a restored verb ending block (Move to Word Builder) stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
-	await page.click("#mode-deconstruct");
+test("Build: a restored verb ending block stays live -- changing its mood dropdown re-resolves to a different real morpheme", async ({ page }) => {
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
-	await page.click("#move-to-builder-btn");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
 	await page.waitForTimeout(500);
 
 	const afterChange = await page.evaluate(() => {
@@ -590,24 +577,22 @@ test("Shareable links: building a chain live-updates the URL, and reloading a ch
 	const page2 = await page.context().newPage();
 	await page2.goto(shareUrl);
 	await expect(page2.locator("#status-line")).toHaveText("qimmeqaq", { timeout: 15_000 });
-	await expect(page2.locator("#mode-build")).toHaveAttribute("aria-selected", "true");
 	await page2.close();
 });
 
-test("Shareable links: a verified Deconstruct result pushes mode+word into the URL, and reloading it restores the same analysis (router.js)", async ({ page }) => {
-	await page.click("#mode-deconstruct");
+test("Shareable links: a verified Deconstruct result pushes word+chain into the URL, and reloading it restores the analysis on the canvas (router.js)", async ({ page }) => {
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
-	await expect(page.locator("#status")).toBeHidden({ timeout: 15_000 });
-	await expect.poll(() => page.evaluate(() => location.search)).toBe("?mode=deconstruct&word=qimmeqarpunga");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
+	await expect.poll(() => page.evaluate(() => location.search)).toContain("word=qimmeqarpunga");
+	await expect.poll(() => page.evaluate(() => location.search)).toContain("chain=");
 
 	const shareUrl = await page.evaluate(() => location.href);
 	const page2 = await page.context().newPage();
 	await page2.goto(shareUrl);
-	await expect(page2.locator("#mode-deconstruct")).toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
 	await expect(page2.locator("#word-input")).toHaveValue("qimmeqarpunga");
-	await expect(page2.locator("#status")).toBeHidden({ timeout: 15_000 });
-	await expect(page2.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog");
+	await expect(page2.locator("#primary-breakdown .breakdown-translation")).toHaveText("I have a dog", { timeout: 20_000 });
+	await expect(page2.locator("#status-line")).toHaveText("qimmeqarpunga");
 	await page2.close();
 });
 
