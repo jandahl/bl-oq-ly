@@ -18,7 +18,7 @@ const deconstructForm = document.getElementById("deconstruct-form");
 const blocklyDiv = document.getElementById("blockly-div");
 const breakdownDiv = document.getElementById("breakdown");
 const breakdownDetails = document.getElementById("breakdown-details");
-const breakdownSummary = document.getElementById("breakdown-summary");
+const breakdownSummaryMeta = document.getElementById("breakdown-summary-meta");
 const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterInput = document.getElementById("morpheme-filter");
@@ -382,11 +382,13 @@ function rerenderBreakdown() {
 	});
 	const n = primary.querySelectorAll(".breakdown-row").length;
 	const translation = primary.querySelector(".breakdown-translation")?.textContent;
-	breakdownSummary.textContent = translation
-		? `Morpheme chain · ${n} · ${translation}`
-		: `Morpheme chain · ${n}`;
+	breakdownSummaryMeta.textContent = translation ? `${n} · ${translation}` : String(n);
+	// Only auto-open the first time the panel appears (a new analysis hides
+	// it first). A later re-render — display-option toggle, etc. — must
+	// leave the learner's fold state alone, or collapsing it is a no-op.
+	const firstShow = breakdownDetails.hidden;
 	breakdownDetails.hidden = false;
-	breakdownDetails.open = window.innerWidth >= 640;
+	if (firstShow) breakdownDetails.open = window.innerWidth >= 640;
 }
 
 async function runDeconstruct({ skipCanvas = false } = {}) {
