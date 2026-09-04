@@ -11,9 +11,59 @@ import { composedTranslation } from "./gloss.js";
 import { readState, writeState } from "./router.js";
 import { loadWorkedExamples } from "./worked-examples.js";
 
+/** Radiogroup of [role=radio][data-value] buttons that behaves like a <select>
+ *  (.value getter/setter + change events) so displayOptions() stays unchanged. */
+function enhanceSegmented(root) {
+	const buttons = () => [...root.querySelectorAll('[role="radio"]')];
+	const apply = (value) => {
+		for (const btn of buttons()) {
+			btn.setAttribute("aria-checked", btn.dataset.value === value ? "true" : "false");
+		}
+		root.dataset.value = value;
+	};
+	Object.defineProperty(root, "value", {
+		configurable: true,
+		get() {
+			return root.dataset.value
+				|| buttons().find((b) => b.getAttribute("aria-checked") === "true")?.dataset.value
+				|| "";
+		},
+		set(value) { apply(value); },
+	});
+	root.addEventListener("click", (event) => {
+		const btn = event.target.closest('[role="radio"]');
+		if (!btn || !root.contains(btn)) return;
+		if (root.value === btn.dataset.value) return;
+		root.value = btn.dataset.value;
+		root.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	apply(root.value);
+	return root;
+}
+
+function bindClearable(input, button) {
+	const sync = () => { button.hidden = !input.value; };
+	button.addEventListener("click", () => {
+		input.value = "";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		input.focus();
+	});
+	input.addEventListener("input", sync);
+	sync();
+	return input;
+}
+
+function setFieldValue(input, value) {
+	input.value = value;
+	input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 const statusEl = document.getElementById("status");
 const statusLine = document.getElementById("status-line");
-const wordInput = document.getElementById("word-input");
+const wordInput = bindClearable(
+	document.getElementById("word-input"),
+	document.getElementById("word-input-clear"),
+);
 const deconstructForm = document.getElementById("deconstruct-form");
 const blocklyDiv = document.getElementById("blockly-div");
 const breakdownDiv = document.getElementById("breakdown");
@@ -21,8 +71,12 @@ const breakdownDetails = document.getElementById("breakdown-details");
 const breakdownSummary = document.getElementById("breakdown-summary");
 const themeToggleBtn = document.getElementById("theme-toggle");
 const paletteToggleBtn = document.getElementById("palette-toggle");
-const filterInput = document.getElementById("morpheme-filter");
-const blocklyThemeSelect = document.getElementById("blockly-theme-select");
+const filterWrap = document.getElementById("morpheme-filter-wrap");
+const filterInput = bindClearable(
+	document.getElementById("morpheme-filter"),
+	document.getElementById("morpheme-filter-clear"),
+);
+const blocklyThemeSelect = enhanceSegmented(document.getElementById("blockly-theme-select"));
 const exampleWordButtons = document.querySelectorAll("[data-example-word]");
 const workedExamplesBtn = document.getElementById("worked-examples-btn");
 const workedExamplesModal = document.getElementById("worked-examples-modal");
@@ -32,8 +86,8 @@ const workedExamplesStatus = document.getElementById("worked-examples-status");
 const workedExamplesList = document.getElementById("worked-examples-list");
 const showIdsCheckbox = document.getElementById("opt-show-ids");
 const readingOrderCheckbox = document.getElementById("opt-reading-order");
-const langSelect = document.getElementById("opt-lang");
-const spellingSelect = document.getElementById("opt-spelling");
+const langSelect = enhanceSegmented(document.getElementById("opt-lang"));
+const spellingSelect = enhanceSegmented(document.getElementById("opt-spelling"));
 const readingLine = document.getElementById("reading-line");
 
 let mode = "build";
@@ -69,7 +123,7 @@ function displayOptions() {
 }
 
 function selectExample(word) {
-	wordInput.value = word;
+	setFieldValue(wordInput, word);
 	runDeconstruct();
 }
 
@@ -294,7 +348,7 @@ function syncURL({ push = false } = {}) {
  * caller already has it, or is about to set it). */
 function applyShareState(state) {
 	if (state.word) {
-		wordInput.value = state.word;
+		setFieldValue(wordInput, state.word);
 		if (!lastDeconstructWord) lastDeconstructWord = state.word;
 	}
 	if (state.chain.length > 0 && workspace) {
@@ -486,7 +540,7 @@ async function main() {
 
 	if (!paletteVisible) {
 		paletteToggleBtn.textContent = "Show palette";
-		filterInput.hidden = true;
+		filterWrap.hidden = true;
 		applyToolbox();
 	}
 
@@ -510,7 +564,7 @@ async function main() {
 	paletteToggleBtn.addEventListener("click", () => {
 		paletteVisible = !paletteVisible;
 		paletteToggleBtn.textContent = paletteVisible ? "Hide palette" : "Show palette";
-		filterInput.hidden = !paletteVisible;
+		filterWrap.hidden = !paletteVisible;
 		applyToolbox();
 		requestAnimationFrame(() => Blockly.svgResize(workspace));
 	});

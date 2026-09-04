@@ -11,6 +11,11 @@
 // snapshot would hide the second kind entirely.
 import { test, expect } from "@playwright/test";
 
+/** Gloss language / morpheme labels / block style are segmented radios, not <select>s. */
+async function choose(page, group, value) {
+	await page.locator(`${group} [data-value="${value}"]`).click();
+}
+
 test.beforeEach(async ({ page }) => {
 	// Uncaught JS exceptions always mean something real broke -- fail hard.
 	page.on("pageerror", (err) => {
@@ -41,6 +46,25 @@ test("catalog loads with a real morpheme count and surfaces the non-authoritativ
 	const status = await page.textContent("#status-line");
 	expect(status).toMatch(/Loaded \d{3,} morphemes\./);
 	expect(status).toContain("hand-authored, not yet dictionary-verified");
+});
+
+test("word and filter fields have a clear button that empties them", async ({ page }) => {
+	await page.fill("#word-input", "qimmeq");
+	await expect(page.locator("#word-input-clear")).toBeVisible();
+	await page.click("#word-input-clear");
+	await expect(page.locator("#word-input")).toHaveValue("");
+	await expect(page.locator("#word-input-clear")).toBeHidden();
+
+	await page.fill("#morpheme-filter", "qimme");
+	await expect(page.locator("#morpheme-filter-clear")).toBeVisible();
+	await page.click("#morpheme-filter-clear");
+	await expect(page.locator("#morpheme-filter")).toHaveValue("");
+	await expect(page.locator("#morpheme-filter-clear")).toBeHidden();
+});
+
+test("credits point at oq-api on GitHub Pages, not the private oq repo", async ({ page }) => {
+	const link = page.locator("footer a", { hasText: /^oq-api$/ });
+	await expect(link).toHaveAttribute("href", "https://jandahl.github.io/oq-api/");
 });
 
 test("Deconstruct: example words load into the analyzer", async ({ page }) => {
@@ -140,8 +164,8 @@ test("Build: block labels always show the real Kalaallisut spelling, and hide gr
 });
 
 test("Build: the morpheme display option explicitly prepends the morpheme to its gloss", async ({ page }) => {
-	const options = await page.locator("#opt-spelling option").allTextContents();
-	expect(options).toEqual(["Show before gloss", "Show without gloss", "Hide (gloss only)"]);
+	const options = await page.locator("#opt-spelling [role=radio]").allTextContents();
+	expect(options).toEqual(["Form + gloss", "Form only", "Gloss only"]);
 
 	await page.fill("#morpheme-filter", "nngit");
 	await page.locator('[role="treeitem"]', { hasText: "Sentential affixes" }).click({ force: true });
@@ -232,7 +256,7 @@ test("Build: the palette's verb ending arrives with inline mood, polarity, and s
 
 	// Renderer changes rebuild the workspace through serialization; the
 	// composed ending and its defaults must survive that round-trip intact.
-	await page.selectOption("#blockly-theme-select", "zelos");
+	await choose(page, "#blockly-theme-select", "zelos");
 	await expect.poll(() => page.evaluate(() => {
 		const block = Blockly.getMainWorkspace().getAllBlocks(false)
 			.find((candidate) => candidate.type === "morpheme_block__verb_ending_picker");
@@ -321,7 +345,7 @@ test("Build: filtering the palette hides the verb ending picker entirely (bl-oq-
 });
 
 test("Danish gloss language: block labels and Deconstruct's translation switch to Danish text (bl-oq-ly#17)", async ({ page }) => {
-	await page.selectOption("#opt-lang", "da");
+	await choose(page, "#opt-lang", "da");
 	await page.fill("#word-input", "qimmeqarpunga");
 	await page.click("#analyze-btn");
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 15_000 });
@@ -332,13 +356,13 @@ test("Danish gloss language: block labels and Deconstruct's translation switch t
 test("Spelling-visibility mode: gloss-only and spelling-only each show exactly what they promise (bl-oq-ly#17)", async ({ page }) => {
 	const stemCat = page.locator('[role="treeitem"]').filter({ hasText: "Stems — nouns" }).first();
 
-	await page.selectOption("#opt-spelling", "gloss-only");
+	await choose(page, "#opt-spelling", "gloss-only");
 	await stemCat.click({ force: true });
 	await page.waitForTimeout(400);
 	const glossOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
 	expect(glossOnlyLabel).not.toContain(" — "); // "both" mode's only separator -- gloss-only never joins two parts
 
-	await page.selectOption("#opt-spelling", "spelling-only");
+	await choose(page, "#opt-spelling", "spelling-only");
 	await stemCat.click({ force: true });
 	await page.waitForTimeout(400);
 	const spellingOnlyLabel = await page.locator(".blocklyFlyout .blocklyDraggable text").first().textContent();
@@ -411,12 +435,12 @@ test("Build: theme toggle actually re-themes Blockly's own chrome, not just the 
 });
 
 test("Build: Blockly theme dropdown switches to Zelos and persists the choice", async ({ page }) => {
-	await page.selectOption("#blockly-theme-select", "zelos");
+	await choose(page, "#blockly-theme-select", "zelos");
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getRenderer().constructor.name)).toMatch(/zelos/i);
 	await page.reload();
 	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
-	await expect(page.locator("#blockly-theme-select")).toHaveValue("zelos");
+	await expect(page.locator("#blockly-theme-select")).toHaveAttribute("data-value", "zelos");
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getTheme().name)).toMatch(/zelos/);
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getRenderer().constructor.name)).toMatch(/zelos/i);
 });
@@ -597,8 +621,8 @@ test("Shareable links: a verified Deconstruct result pushes word+chain into the 
 });
 
 test("Shareable links: display options (language, spelling mode) are deliberately NOT in the URL -- they stay a per-visitor preference, not shared content", async ({ page }) => {
-	await page.selectOption("#opt-lang", "da");
-	await page.selectOption("#opt-spelling", "gloss-only");
+	await choose(page, "#opt-lang", "da");
+	await choose(page, "#opt-spelling", "gloss-only");
 	await page.waitForTimeout(200);
 	const search = await page.evaluate(() => location.search);
 	expect(search).not.toContain("lang");

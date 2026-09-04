@@ -15,24 +15,29 @@
 		<p class="subtitle">A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.</p>
 		<form class="deconstruct-input" id="deconstruct-form">
 			<label for="word-input">Attested word</label>
-			<input id="word-input" type="text" placeholder="e.g. qimmeqarpunga" autocomplete="off" spellcheck="false" />
+			<div class="clearable">
+				<input id="word-input" type="text" placeholder="e.g. qimmeqarpunga" autocomplete="off" spellcheck="false" />
+				<button type="button" class="clear-field" id="word-input-clear" hidden aria-label="Clear word">×</button>
+			</div>
 			<button id="analyze-btn" type="submit">Deconstruct</button>
 		</form>
 		<div class="view-options">
 			<label><input type="checkbox" id="opt-reading-order" checked /> Read last morpheme first</label>
-			<label>Gloss language
-				<select id="opt-lang">
-					<option value="en">English</option>
-					<option value="da">Dansk</option>
-				</select>
-			</label>
-			<label>Morpheme
-				<select id="opt-spelling">
-					<option value="both">Show before gloss</option>
-					<option value="spelling-only">Show without gloss</option>
-					<option value="gloss-only">Hide (gloss only)</option>
-				</select>
-			</label>
+			<div class="option-cluster">
+				<span id="opt-lang-label">Gloss language</span>
+				<div id="opt-lang" class="segmented" role="radiogroup" aria-labelledby="opt-lang-label">
+					<button type="button" role="radio" data-value="en" aria-checked="true">English</button>
+					<button type="button" role="radio" data-value="da" aria-checked="false">Dansk</button>
+				</div>
+			</div>
+			<div class="option-cluster">
+				<span id="opt-spelling-label">Morpheme labels</span>
+				<div id="opt-spelling" class="segmented" role="radiogroup" aria-labelledby="opt-spelling-label">
+					<button type="button" role="radio" data-value="both" aria-checked="true">Form + gloss</button>
+					<button type="button" role="radio" data-value="spelling-only" aria-checked="false">Form only</button>
+					<button type="button" role="radio" data-value="gloss-only" aria-checked="false">Gloss only</button>
+				</div>
+			</div>
 			<label><input type="checkbox" id="opt-show-ids" /> Add internal API ids</label>
 		</div>
 	</header>
@@ -45,13 +50,17 @@
 
 		<div class="palette-controls">
 			<button id="palette-toggle" type="button">Hide palette</button>
-			<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
-			<label class="blockly-theme-control">Blockly theme
-				<select id="blockly-theme-select">
-					<option value="classic">Classic</option>
-					<option value="zelos">Zelos</option>
-				</select>
-			</label>
+			<div class="clearable" id="morpheme-filter-wrap">
+				<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
+				<button type="button" class="clear-field" id="morpheme-filter-clear" hidden aria-label="Clear filter">×</button>
+			</div>
+			<div class="option-cluster">
+				<span id="blockly-theme-label">Block style</span>
+				<div id="blockly-theme-select" class="segmented" role="radiogroup" aria-labelledby="blockly-theme-label">
+					<button type="button" role="radio" data-value="classic" aria-checked="true">Classic</button>
+					<button type="button" role="radio" data-value="zelos" aria-checked="false">Zelos</button>
+				</div>
+			</div>
 		</div>
 
 		<div id="blockly-div"></div>
@@ -84,7 +93,7 @@
 		</div>
 		<p class="modal-description">
 			Attested examples from the grammarian corpus used by
-			<a href="https://github.com/jandahl/oq" target="_blank" rel="noreferrer">jandahl/oq</a>
+			<a href="https://jandahl.github.io/oq-api/" target="_blank" rel="noreferrer">oq-api</a>
 			for its build and Deconstruct CI checks.
 		</p>
 		<label class="modal-filter">Filter examples
@@ -96,8 +105,7 @@
 
 	<footer>
 		<p>
-			Consumes <a href="https://github.com/jandahl/oq">oq</a>'s experimental
-			<a href="https://github.com/jandahl/oq/blob/master/docs/public-api.md">public API</a>
+			Consumes <a href="https://jandahl.github.io/oq-api/">oq-api</a>'s public API
 			(the published oq-api v0.0.5 package, see README) and
 			<a href="https://github.com/jandahl/jandahl-custom-KAL-grammarian">jandahl-custom-KAL-grammarian</a>'s
 			published morpheme data. Not linked from oq's main app; direct-URL only, by design.
