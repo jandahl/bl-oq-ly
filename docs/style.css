@@ -55,6 +55,7 @@ header {
 }
 
 .header-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.header-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 h1 { margin: 0 0 0.2rem; font-size: 1.2rem; }
 .theme-toggle {
 	padding: 0.3rem 0.6rem;
@@ -134,6 +135,13 @@ h1 { margin: 0 0 0.2rem; font-size: 1.2rem; }
 	font-size: 0.8rem;
 	align-items: center;
 }
+#display-panel[hidden] { display: none; }
+@media (min-width: 720px) {
+	#display-toggle { display: none !important; }
+}
+@media (max-width: 719px) {
+	#display-panel:not(.is-open) { display: none; }
+}
 .view-options label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
 .view-options input { cursor: pointer; }
 .option-cluster {
@@ -144,6 +152,7 @@ h1 { margin: 0 0 0.2rem; font-size: 1.2rem; }
 }
 .segmented {
 	display: inline-flex;
+	max-width: 100%;
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	overflow: hidden;
@@ -243,6 +252,53 @@ main {
 	.blocklyTreeLabel,
 	.blocklyToolboxDiv [role="treeitem"],
 	.blocklyToolbox [role="treeitem"] { font-size: 0.75rem; }
+	.blocklyZoom { display: none !important; }
+}
+
+@media (max-width: 719px) {
+	html, body { overflow-x: hidden; }
+	header { padding: 0.55rem 0.75rem 0.4rem; }
+	.subtitle { display: none; }
+	.deconstruct-input { margin-bottom: 0.35rem; }
+	.deconstruct-input label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+	.deconstruct-input .clearable { flex: 1 1 100%; }
+	#analyze-btn { width: 100%; min-height: 2.75rem; }
+	.deconstruct-input .clearable input,
+	.palette-controls .clearable input,
+	.modal-filter input { font-size: 16px; }
+	.view-options {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.7rem;
+		padding: 0.7rem 0 0.15rem;
+	}
+	.option-cluster {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.25rem;
+	}
+	.segmented {
+		display: flex;
+		width: 100%;
+	}
+	.segmented [role="radio"] {
+		flex: 1 1 0;
+		min-width: 0;
+		min-height: 2.75rem;
+		padding: 0.4rem 0.35rem;
+		font-size: 0.75rem;
+	}
+	#blockly-div {
+		height: min(58dvh, 28rem);
+		min-height: 16rem;
+	}
+	.theme-toggle { min-height: 2.5rem; }
+	footer { overflow-wrap: anywhere; }
+	.worked-examples-list { grid-template-columns: 1fr; max-height: min(50dvh, 20rem); }
+}
+
+@media (max-width: 480px) {
+	.breakdown-word { font-size: 1.3rem; }
 }
 
 #breakdown {
@@ -414,8 +470,3 @@ footer {
 }
 footer a { color: var(--accent); }
 
-@media (max-width: 480px) {
-	.breakdown-word { font-size: 1.3rem; }
-	html, body { overflow-x: hidden; }
-	.deconstruct-input label { flex-basis: auto; width: auto; }
-}

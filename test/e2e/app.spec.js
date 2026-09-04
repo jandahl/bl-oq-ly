@@ -639,6 +639,22 @@ test("Build: on a phone-width viewport, the toolbox tree stays a minority of the
 	expect(toolboxDivWidth / blocklyDivWidth).toBeLessThan(0.5);
 });
 
+test("phone layout: display options collapse behind a toggle and the page does not overflow sideways", async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.reload();
+	await expect(page.locator("#status-line")).toContainText("Loaded", { timeout: 20_000 });
+	await expect(page.locator("#display-toggle")).toBeVisible();
+	await expect(page.locator("#display-panel")).toBeHidden();
+	const overflowed = await page.evaluate(
+		() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+	);
+	expect(overflowed).toBe(false);
+	await page.click("#display-toggle");
+	await expect(page.locator("#display-panel")).toBeVisible();
+	await choose(page, "#opt-lang", "da");
+	await expect(page.locator('#opt-lang [data-value="da"]')).toHaveAttribute("aria-checked", "true");
+});
+
 test("Build: pinch-to-zoom is enabled on the workspace (bl-oq-ly#20 -- Blockly doesn't turn this on by default)", async ({ page }) => {
 	const pinchEnabled = await page.evaluate(() => Blockly.getMainWorkspace().options.zoomOptions.pinch);
 	expect(pinchEnabled).toBe(true);

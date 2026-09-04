@@ -70,6 +70,8 @@ const breakdownDiv = document.getElementById("breakdown");
 const breakdownDetails = document.getElementById("breakdown-details");
 const breakdownSummary = document.getElementById("breakdown-summary");
 const themeToggleBtn = document.getElementById("theme-toggle");
+const displayToggleBtn = document.getElementById("display-toggle");
+const displayPanel = document.getElementById("display-panel");
 const paletteToggleBtn = document.getElementById("palette-toggle");
 const filterWrap = document.getElementById("morpheme-filter-wrap");
 const filterInput = bindClearable(
@@ -248,6 +250,32 @@ function initBlocklyTheme() {
 		localStorage.setItem("bl-oq-ly:blockly-theme", selectedBlocklyTheme);
 		rebuildWorkspace();
 	});
+}
+
+const DISPLAY_MQ = window.matchMedia("(min-width: 720px)");
+
+function initDisplayChrome() {
+	function sync() {
+		if (DISPLAY_MQ.matches) {
+			displayPanel.classList.add("is-open");
+			displayToggleBtn.setAttribute("aria-expanded", "true");
+			return;
+		}
+		if (displayToggleBtn.dataset.userToggled === "true") return;
+		displayPanel.classList.remove("is-open");
+		displayToggleBtn.setAttribute("aria-expanded", "false");
+	}
+	displayToggleBtn.addEventListener("click", () => {
+		const open = !displayPanel.classList.contains("is-open");
+		displayPanel.classList.toggle("is-open", open);
+		displayToggleBtn.dataset.userToggled = "true";
+		displayToggleBtn.setAttribute("aria-expanded", String(open));
+	});
+	DISPLAY_MQ.addEventListener("change", () => {
+		if (!DISPLAY_MQ.matches) displayToggleBtn.dataset.userToggled = "";
+		sync();
+	});
+	sync();
 }
 
 function workspaceOptions() {
@@ -521,6 +549,7 @@ async function main() {
 	initTheme();
 	initBlocklyTheme();
 	initDisplayOptions();
+	initDisplayChrome();
 	setStatus("Loading morpheme catalog…", "");
 	const catalog = await loadCatalog();
 	presets = catalog.presets;
