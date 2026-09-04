@@ -13,10 +13,11 @@
 			<button id="theme-toggle" class="theme-toggle" type="button">Theme: Auto</button>
 		</div>
 		<p class="subtitle">A block-based learning aid for building and taking apart Kalaallisut words. Prototype — nothing here is authoritative.</p>
-		<div class="mode-toggle" role="tablist">
-			<button id="mode-build" role="tab" aria-selected="true" class="active">Build</button>
-			<button id="mode-deconstruct" role="tab" aria-selected="false">Deconstruct</button>
-		</div>
+		<form class="deconstruct-input" id="deconstruct-form">
+			<label for="word-input">Attested word</label>
+			<input id="word-input" type="text" placeholder="e.g. qimmeqarpunga" autocomplete="off" spellcheck="false" />
+			<button id="analyze-btn" type="submit">Deconstruct</button>
+		</form>
 		<div class="view-options">
 			<label><input type="checkbox" id="opt-reading-order" checked /> Read last morpheme first</label>
 			<label>Gloss language
@@ -37,32 +38,24 @@
 	</header>
 
 	<main>
-		<section id="panel-build" class="panel active">
-			<p class="hint">Drag morpheme blocks from the palette and snap them into a single stack, stem first. The result updates as you build.</p>
-			<div class="palette-controls">
-				<button id="palette-toggle" type="button">Hide palette</button>
-				<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
-				<label class="blockly-theme-control">Blockly theme
-					<select id="blockly-theme-select">
-						<option value="classic">Classic</option>
-						<option value="zelos">Zelos</option>
-					</select>
-				</label>
-			</div>
-		</section>
+		<details id="breakdown-details" hidden>
+			<summary id="breakdown-summary">Morpheme chain</summary>
+			<div id="breakdown"></div>
+		</details>
 
-		<section id="panel-deconstruct" class="panel">
-			<div class="deconstruct-input">
-				<label for="word-input">Attested word</label>
-				<input id="word-input" type="text" placeholder="e.g. qimmeqarpoq" autocomplete="off" spellcheck="false" />
-				<button id="analyze-btn">Deconstruct</button>
-			</div>
-			<p class="hint">Type a real Kalaallisut word and see it broken into a morpheme chain. The chain is a verified rebuild, not a guess.</p>
-			<button id="move-to-builder-btn" type="button" hidden>Move to Word Builder →</button>
-		</section>
+		<div class="palette-controls">
+			<button id="palette-toggle" type="button">Hide palette</button>
+			<input id="morpheme-filter" type="text" placeholder="Filter by Kalaallisut form, id, or gloss…" autocomplete="off" spellcheck="false" />
+			<label class="blockly-theme-control">Blockly theme
+				<select id="blockly-theme-select">
+					<option value="classic">Classic</option>
+					<option value="zelos">Zelos</option>
+				</select>
+			</label>
+		</div>
 
 		<div id="blockly-div"></div>
-		<div id="breakdown" hidden></div>
+
 		<p id="reading-line" class="reading-line" hidden></p>
 
 		<section id="status" aria-live="polite">
@@ -71,7 +64,7 @@
 
 		<section id="example-words" aria-labelledby="example-words-heading">
 			<h2 id="example-words-heading">Try an example</h2>
-			<p>Jump straight to a word in Deconstruct:</p>
+			<p>Deconstructs the word and drops the verified chain onto the canvas.</p>
 			<div class="example-word-list">
 				<button type="button" data-example-word="qimmeq" data-example-class="noun">qimmeq</button>
 				<button type="button" data-example-word="aallarpoq" data-example-class="verb">aallarpoq</button>
