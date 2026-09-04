@@ -26,12 +26,32 @@ test("collapsing the analysis details does not wipe the Build canvas", async ({ 
 	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
 	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
 	await expect(page.locator("#status-line")).toHaveText("qimmeqarpunga");
+	await expect(page.locator("#breakdown-details")).toHaveAttribute("open", "");
 
 	await page.locator("#breakdown-summary").click();
 	await expect(page.locator("#breakdown-details")).not.toHaveAttribute("open");
 	await expect(page.locator("#primary-breakdown")).toBeHidden();
+	await expect(page.locator("#breakdown-summary")).toBeVisible();
+	await expect(page.locator("#breakdown-summary-meta")).toContainText("I have a dog");
 
 	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).length)).toBeGreaterThan(0);
 	await expect(page.locator("#status-line")).toHaveText("qimmeqarpunga");
 	await expect(page.locator("#word-input")).toHaveValue("qimmeqarpunga");
+
+	await page.locator("#breakdown-summary").click();
+	await expect(page.locator("#breakdown-details")).toHaveAttribute("open", "");
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga");
+	await expect.poll(() => page.evaluate(() => Blockly.getMainWorkspace().getAllBlocks(false).length)).toBeGreaterThan(0);
+});
+
+test("a collapsed analysis stays collapsed when display options change", async ({ page }) => {
+	await page.getByRole("button", { name: "qimmeqarpunga", exact: true }).click();
+	await expect(page.locator("#primary-breakdown .breakdown-word")).toHaveText("qimmeqarpunga", { timeout: 20_000 });
+	await page.locator("#breakdown-summary").click();
+	await expect(page.locator("#breakdown-details")).not.toHaveAttribute("open");
+
+	await page.click("#opt-reading-order");
+	await expect(page.locator("#breakdown-details")).not.toHaveAttribute("open");
+	await expect(page.locator("#primary-breakdown")).toBeHidden();
+	await expect(page.locator("#breakdown-summary")).toBeVisible();
 });

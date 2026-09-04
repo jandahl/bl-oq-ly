@@ -130,13 +130,62 @@ main {
 	background: var(--panel-bg);
 }
 #breakdown-details[hidden] { display: none; }
-#breakdown-details summary {
+
+/* Custom disclosure triangle so the fold is obvious: native <summary>
+   markers are easy to miss once the row is restyled, and some engines
+   drop them entirely when summary is a flex box. */
+#breakdown-details > summary,
+.alternative-breakdowns > summary {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	list-style: none;
 	cursor: pointer;
-	padding: 0.6rem 0.9rem;
+	padding: 0.7rem 0.9rem;
 	font-weight: 600;
 	color: var(--accent);
+	user-select: none;
+	touch-action: manipulation;
+	min-height: 2.75rem;
 }
-#breakdown-details[open] summary { border-bottom: 1px solid var(--border); }
+#breakdown-details > summary::-webkit-details-marker,
+.alternative-breakdowns > summary::-webkit-details-marker { display: none; }
+#breakdown-details > summary::marker,
+.alternative-breakdowns > summary::marker { content: ""; }
+#breakdown-details > summary::before,
+.alternative-breakdowns > summary::before {
+	content: "";
+	width: 0.45rem;
+	height: 0.45rem;
+	flex-shrink: 0;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 0.15s ease;
+}
+#breakdown-details[open] > summary::before,
+.alternative-breakdowns[open] > summary::before {
+	transform: rotate(45deg);
+}
+#breakdown-details > summary:hover,
+.alternative-breakdowns > summary:hover {
+	background: color-mix(in srgb, var(--accent) 8%, var(--panel-bg));
+}
+#breakdown-details[open] > summary { border-bottom: 1px solid var(--border); }
+.disclosure-label { flex-shrink: 0; }
+.disclosure-meta {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-weight: 400;
+	color: color-mix(in srgb, var(--fg) 62%, transparent);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+	#breakdown-details > summary::before,
+	.alternative-breakdowns > summary::before { transition: none; }
+}
 
 .palette-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
 .palette-controls button {
@@ -282,12 +331,10 @@ main {
 .alternative-breakdowns {
 	margin-top: 1rem;
 	border-top: 1px solid var(--border);
-	padding-top: 0.75rem;
+	padding-top: 0.25rem;
 }
-.alternative-breakdowns summary {
-	color: var(--accent);
-	cursor: pointer;
-	font-weight: 600;
+.alternative-breakdowns > summary {
+	border-radius: 4px;
 }
 .alternative-breakdown-list {
 	display: flex;
