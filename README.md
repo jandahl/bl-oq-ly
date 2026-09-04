@@ -2,7 +2,7 @@
 
 A Blockly-based, block-snap learning aid for building and deconstructing
 Kalaallisut words — a Scratch-shaped front end over
-[`oq`](https://github.com/jandahl/oq)'s morphology engine.
+[`oq-api`](https://jandahl.github.io/oq-api/)'s morphology engine.
 
 **Status: MVP prototype.** Deliberately not linked from oq's main app; this
 is a standalone static site, reachable only by its own direct URL.
@@ -108,12 +108,12 @@ The display controls under the deconstruct form are persisted:
   top of the current one-directional connections, since that constraint (and
   `buildWord()`'s own stem-first requirement) would need solving properly
   first, not worked around per-toggle.
-- **Morpheme display** (`#opt-spelling`, show before gloss / show without
-  gloss / hide). "Show before gloss" is the default and prepends the
-  catalog's morpheme form to its explanation: `-nngit — negation, ___ not`.
-  The other modes support recall practice by showing the morpheme alone or
-  hiding it in favour of the gloss. This is the learner-facing identity of a
-  block and is deliberately distinct from its internal API id.
+- **Morpheme labels** (`#opt-spelling`, form + gloss / form only / gloss
+  only). "Form + gloss" is the default and prepends the catalog's morpheme
+  form to its explanation: `-nngit — negation, ___ not`. The other modes
+  support recall practice by showing the morpheme alone or hiding it in
+  favour of the gloss. This is the learner-facing identity of a block and is
+  deliberately distinct from its internal API id.
 - **"Add internal API ids"** (default off). Grammarian's opaque ids
   (`V_IND_INTR_1SG`, `N_qaq_Vb`, ...) are optional diagnostics for
   cross-referencing the source data. When enabled, an id follows the entire

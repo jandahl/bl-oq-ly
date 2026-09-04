@@ -12,6 +12,7 @@ const browserGlobals = {
 	sessionStorage: "readonly",
 	requestAnimationFrame: "readonly",
 	AbortController: "readonly",
+	Event: "readonly",
 	console: "readonly",
 	location: "readonly",
 	history: "readonly",
