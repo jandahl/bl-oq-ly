@@ -9,8 +9,8 @@
 //
 // Point at the versioned Pages distribution rather than an unversioned
 // deployment tracking oq's development branch. The published package path
-// is v0.0.5; its API_VERSION is reported separately by oq itself.
-const OQ_API_URL = "https://jandahl.github.io/oq-api/api/v0.0.5/public-api.js";
+// is v0.1-latest; its concrete API_VERSION is reported separately by oq itself.
+const OQ_API_URL = "https://jandahl.github.io/oq-api/api/v0.1-latest/public-api.js";
 
 export const {
 	buildWord,
