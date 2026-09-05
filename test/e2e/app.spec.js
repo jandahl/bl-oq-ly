@@ -169,7 +169,7 @@ test("Build: the morpheme display option explicitly prepends the morpheme to its
 
 	await page.fill("#morpheme-filter", "nngit");
 	await page.locator('[role="treeitem"]', { hasText: "Sentential affixes" }).click({ force: true });
-	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ }).textContent();
+	const label = await page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+do not/ }).textContent();
 	expect(label.indexOf("-nngit")).toBe(0);
 });
 
@@ -178,7 +178,7 @@ test("Build: filtering by -nngit surfaces the ordinary negator by its Kalaallisu
 	const sententialCategory = page.locator('[role="treeitem"]', { hasText: "Sentential affixes" });
 	await expect(sententialCategory).toBeVisible();
 	await sententialCategory.click({ force: true });
-	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+negation/ })).toBeVisible();
+	await expect(page.locator(".blocklyFlyout .blocklyDraggable text").filter({ hasText: /^-nngit\s+—\s+do not/ })).toBeVisible();
 });
 
 test("Build: verb ending exposes inline mood, polarity, and subject controls", async ({ page }) => {
